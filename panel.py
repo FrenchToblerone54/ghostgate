@@ -1,0 +1,546 @@
+import os
+import sys
+import json
+import uuid
+import base64
+import io
+import time
+import threading
+import subprocess
+from urllib.parse import quote
+from datetime import datetime, timezone
+from flask import Flask, jsonify, request, Response, render_template_string
+import psutil
+import qrcode
+from dotenv import dotenv_values, set_key
+import database as db
+import updater
+from xui_client import XUIClient
+
+app = Flask(__name__)
+BASE_URL = ""
+
+def _sys_info():
+    cpu = psutil.cpu_percent(interval=0.1)
+    ram = psutil.virtual_memory()
+    swap = psutil.swap_memory()
+    disk = psutil.disk_usage("/")
+    net = psutil.net_io_counters()
+    load = psutil.getloadavg()
+    return {
+        "cpu_percent": cpu, "cpu_count": psutil.cpu_count(),
+        "ram_percent": ram.percent, "ram_used": ram.used // 1048576, "ram_total": ram.total // 1048576,
+        "swap_percent": swap.percent, "swap_used": swap.used // 1048576, "swap_total": swap.total // 1048576,
+        "disk_percent": disk.percent, "disk_used": round(disk.used / 1073741824, 2), "disk_total": round(disk.total / 1073741824, 2),
+        "net_sent": net.bytes_sent, "net_recv": net.bytes_recv,
+        "load_1": round(load[0], 2), "load_5": round(load[1], 2), "load_15": round(load[2], 2)
+    }
+
+def _fmt_vless(client_uuid, label, server, port, stream_settings, security):
+    params = {"type": stream_settings.get("network", "tcp"), "security": security}
+    network = stream_settings.get("network", "tcp")
+    tcp_s = stream_settings.get("tcpSettings", {})
+    ws_s = stream_settings.get("wsSettings", {})
+    grpc_s = stream_settings.get("grpcSettings", {})
+    kcp_s = stream_settings.get("kcpSettings", {})
+    hu_s = stream_settings.get("httpupgradeSettings", {})
+    xhttp_s = stream_settings.get("xhttpSettings", {})
+    tls_s = stream_settings.get("tlsSettings", {})
+    reality_s = stream_settings.get("realitySettings", {})
+    if network == "tcp":
+        htype = tcp_s.get("header", {}).get("type", "none")
+        if htype != "none":
+            params["headerType"] = htype
+        paths = tcp_s.get("header", {}).get("request", {}).get("path", [])
+        if paths:
+            params["path"] = paths[0]
+        hosts = tcp_s.get("header", {}).get("request", {}).get("headers", {}).get("Host", [""])
+        if hosts and hosts[0]:
+            params["host"] = hosts[0]
+    elif network == "ws":
+        params["path"] = ws_s.get("path", "/")
+        host = ws_s.get("headers", {}).get("Host", "")
+        if host:
+            params["host"] = host
+    elif network == "grpc":
+        params["serviceName"] = grpc_s.get("serviceName", "")
+        params["mode"] = "multi"
+    elif network == "kcp":
+        params["headerType"] = kcp_s.get("header", {}).get("type", "none")
+        seed = kcp_s.get("seed", "")
+        if seed:
+            params["seed"] = seed
+    elif network in ("httpupgrade", "xhttp"):
+        s = hu_s if network == "httpupgrade" else xhttp_s
+        params["path"] = s.get("path", "/")
+        host = s.get("host", "")
+        if host:
+            params["host"] = host
+        if network == "xhttp":
+            params["mode"] = s.get("mode", "auto")
+    if security == "tls":
+        fp = tls_s.get("fingerprint", "")
+        if fp:
+            params["fp"] = fp
+        alpn = tls_s.get("alpn", [])
+        if alpn:
+            params["alpn"] = ",".join(alpn)
+        sni = tls_s.get("serverName", "")
+        if sni:
+            params["sni"] = sni
+        if tls_s.get("allowInsecure", False):
+            params["allowInsecure"] = "1"
+    elif security == "reality":
+        params["pbk"] = reality_s.get("publicKey", "")
+        fp = reality_s.get("fingerprint", "")
+        if fp:
+            params["fp"] = fp
+        sni = (reality_s.get("serverNames") or [""])[0]
+        if sni:
+            params["sni"] = sni
+        sid = (reality_s.get("shortIds") or [""])[0]
+        if sid:
+            params["sid"] = sid
+        spx = reality_s.get("spiderX", "")
+        if spx:
+            params["spx"] = quote(spx)
+    query = "&".join(f"{k}={quote(str(v))}" for k, v in params.items())
+    return f"vless://{client_uuid}@{server}:{port}?{query}#{quote(label)}"
+
+def _make_qr_b64(text):
+    qr = qrcode.QRCode(box_size=6, border=2)
+    qr.add_data(text)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#00e5a0", back_color="#1a1d2e")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode()
+
+@app.route("/sub/<sub_id>")
+def sub_page(sub_id):
+    sub = db.get_sub(sub_id)
+    if not sub:
+        return "Not Found", 404
+    db.log_access(sub_id)
+    snodes = db.get_sub_nodes(sub_id)
+    base_url = BASE_URL or request.host_url.rstrip("/")
+    sub_url = f"{base_url}/sub/{sub_id}"
+    total_bytes = sub.get("used_bytes") or 0
+    limit_bytes = int(sub["data_gb"] * 1073741824) if sub["data_gb"] > 0 else 0
+    expire_ts = 0
+    if sub.get("expire_at"):
+        try:
+            expire_ts = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp())
+        except Exception:
+            pass
+    ua = request.headers.get("User-Agent", "")
+    is_browser = any(b in ua for b in ["Mozilla", "Chrome", "Safari", "Firefox", "Edge", "Opera"])
+    if is_browser:
+        qr_b64 = _make_qr_b64(sub_url)
+        data_percent = min(100, int(total_bytes * 100 / limit_bytes)) if limit_bytes > 0 else 0
+        data_used_str = f"{total_bytes/1073741824:.2f} GB"
+        data_total_str = f"{sub['data_gb']:.1f} GB" if limit_bytes > 0 else "Unlimited"
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        is_expired = expire_ts > 0 and expire_ts < now_ts
+        is_over_limit = limit_bytes > 0 and total_bytes >= limit_bytes
+        if expire_ts > 0:
+            diff = expire_ts - now_ts
+            if diff > 0:
+                expire_str = f"{diff // 86400}d {(diff % 86400) // 3600}h"
+            else:
+                expire_str = "Expired"
+        else:
+            expire_str = "No Expiry"
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base_dir, "frontend", "sub.html")) as f:
+            tmpl = f.read()
+        return render_template_string(tmpl,
+            sub_url=sub_url, qr_b64=qr_b64,
+            comment=sub.get("comment") or "Subscription",
+            data_used_str=data_used_str, data_total_str=data_total_str, data_percent=data_percent,
+            expire_str=expire_str, is_expired=is_expired, is_over_limit=is_over_limit
+        )
+    configs = []
+    for sn in snodes:
+        try:
+            xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+            inbound = xui.get_inbound(sn["inbound_id"])
+            if not inbound:
+                continue
+            stream = json.loads(inbound.get("streamSettings", "{}"))
+            orig_security = stream.get("security", "none")
+            orig_port = inbound.get("port", 443)
+            raw_addr = sn["address"].split("//")[-1].split("/")[0]
+            orig_server = raw_addr.split(":")[0]
+            ext_proxies = stream.get("externalProxy") or []
+            if ext_proxies:
+                for i, ep in enumerate(ext_proxies):
+                    ep_server = ep.get("dest", orig_server)
+                    ep_port = ep.get("port", orig_port)
+                    force_tls = ep.get("forceTls", "same")
+                    ep_security = orig_security if force_tls == "same" else force_tls
+                    ep_stream = dict(stream)
+                    ep_stream["security"] = ep_security
+                    label = f"{sn['name']}-{i+1}" if i > 0 else sn["name"]
+                    configs.append(_fmt_vless(sn["client_uuid"], label, ep_server, ep_port, ep_stream, ep_security))
+            else:
+                configs.append(_fmt_vless(sn["client_uuid"], sn["name"], orig_server, orig_port, stream, orig_security))
+        except Exception:
+            pass
+    headers = {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Profile-Title": base64.b64encode((sub.get("comment") or "GhostGate").encode()).decode(),
+        "subscription-userinfo": f"upload=0;download={total_bytes};total={limit_bytes};expire={expire_ts}",
+        "profile-update-interval": "1",
+        "Content-Disposition": "attachment; filename=ghostgate",
+        "profile-web-page-url": sub_url
+    }
+    return "\n".join(configs), 200, headers
+
+def register_routes(panel_path):
+    global BASE_URL
+    BASE_URL = os.getenv("BASE_URL", "")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(base_dir, "frontend", "index.html")) as f:
+        _panel_html = f.read().replace("{{prefix}}", f"/{panel_path}")
+    _err_pages = {}
+    for code in [400, 403, 404, 405, 500]:
+        fp = os.path.join(base_dir, "frontend", f"{code}.html")
+        try:
+            with open(fp) as f:
+                _err_pages[code] = f.read()
+        except Exception:
+            _err_pages[code] = ""
+
+    @app.route(f"/{panel_path}/", strict_slashes=False)
+    def panel_index():
+        return _panel_html
+
+    @app.route(f"/{panel_path}/api/status")
+    def api_status():
+        stats = db.get_overview_stats()
+        sys_info = _sys_info()
+        return jsonify({**stats, "system": sys_info})
+
+    @app.route(f"/{panel_path}/api/stream")
+    def api_stream():
+        def _gen():
+            while True:
+                try:
+                    stats = db.get_overview_stats()
+                    sys_info = _sys_info()
+                    yield f"data: {json.dumps({**stats, 'system': sys_info})}\n\n"
+                except Exception:
+                    pass
+                time.sleep(3)
+        return Response(_gen(), content_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    @app.route(f"/{panel_path}/api/subscriptions")
+    def api_subs_list():
+        page = int(request.args.get("page", 1))
+        per_page = int(request.args.get("per_page", 20))
+        search = request.args.get("search", "").strip() or None
+        subs, total = db.get_subs(page, per_page, search)
+        for sub in subs:
+            sub["node_names"] = [sn["name"] for sn in db.get_sub_nodes(sub["id"])]
+        return jsonify({"subs": subs, "total": total, "page": page, "per_page": per_page})
+
+    @app.route(f"/{panel_path}/api/subscriptions", methods=["POST"])
+    def api_subs_create():
+        data = request.json
+        comment = data.get("comment")
+        data_gb = float(data.get("data_gb", 0))
+        days = int(data.get("days", 0))
+        ip_limit = int(data.get("ip_limit", 0))
+        node_ids = [int(n) for n in data.get("node_ids", [])]
+        sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit)
+        sub = db.get_sub(sub_id)
+        client_uuid = str(uuid.uuid4())
+        expire_ms = 0
+        if sub.get("expire_at"):
+            try:
+                expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
+            except Exception:
+                pass
+        errors = []
+        for node_id in node_ids:
+            node = db.get_node(node_id)
+            if not node:
+                continue
+            try:
+                xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
+                client = xui.make_client(sub_id, client_uuid, expire_ms, ip_limit, sub_id, comment or "")
+                ok = xui.add_client(node["inbound_id"], client)
+                if ok:
+                    db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
+                else:
+                    errors.append(f"node {node_id}: failed to add client")
+            except Exception as e:
+                errors.append(f"node {node_id}: {e}")
+        base_url = BASE_URL or request.host_url.rstrip("/")
+        return jsonify({"id": sub_id, "uuid": client_uuid, "url": f"{base_url}/sub/{sub_id}", "errors": errors})
+
+    @app.route(f"/{panel_path}/api/subscriptions/<sub_id>")
+    def api_sub_get(sub_id):
+        sub = db.get_sub(sub_id)
+        if not sub:
+            return jsonify({"error": "not found"}), 404
+        sub["nodes"] = db.get_sub_nodes(sub_id)
+        return jsonify(sub)
+
+    @app.route(f"/{panel_path}/api/subscriptions/<sub_id>", methods=["PUT"])
+    def api_sub_update(sub_id):
+        data = request.json
+        updates = {k: data[k] for k in ["comment", "data_gb", "days", "ip_limit"] if k in data}
+        db.update_sub(sub_id, **updates)
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/subscriptions/<sub_id>", methods=["DELETE"])
+    def api_sub_delete(sub_id):
+        snodes = db.get_sub_nodes(sub_id)
+        for sn in snodes:
+            try:
+                xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                xui.delete_client(sn["inbound_id"], sn["client_uuid"])
+            except Exception:
+                pass
+        db.delete_sub(sub_id)
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/nodes", methods=["POST"])
+    def api_sub_add_nodes(sub_id):
+        sub = db.get_sub(sub_id)
+        if not sub:
+            return jsonify({"error": "not found"}), 404
+        node_ids = [int(n) for n in request.json.get("node_ids", [])]
+        existing = {sn["node_id"] for sn in db.get_sub_nodes(sub_id)}
+        expire_ms = 0
+        if sub.get("expire_at"):
+            try:
+                expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
+            except Exception:
+                pass
+        errors = []
+        for node_id in node_ids:
+            if node_id in existing:
+                continue
+            node = db.get_node(node_id)
+            if not node:
+                continue
+            try:
+                client_uuid = str(uuid.uuid4())
+                xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
+                client = xui.make_client(sub_id, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "")
+                ok = xui.add_client(node["inbound_id"], client)
+                if ok:
+                    db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
+                else:
+                    errors.append(f"node {node_id}: failed to add client")
+            except Exception as e:
+                errors.append(f"node {node_id}: {e}")
+        return jsonify({"ok": True, "errors": errors})
+
+    @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/nodes/<int:node_id>", methods=["DELETE"])
+    def api_sub_remove_node(sub_id, node_id):
+        snodes = db.get_sub_nodes(sub_id)
+        sn = next((s for s in snodes if s["node_id"] == node_id), None)
+        if sn:
+            try:
+                xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                xui.delete_client(sn["inbound_id"], sn["client_uuid"])
+            except Exception:
+                pass
+            db.remove_sub_node(sub_id, node_id)
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/bulk/nodes", methods=["POST"])
+    def api_bulk_nodes():
+        data = request.json
+        sub_ids = data.get("sub_ids", [])
+        node_ids = [int(n) for n in data.get("node_ids", [])]
+        action = data.get("action")
+        errors = []
+        for sub_id in sub_ids:
+            sub = db.get_sub(sub_id)
+            if not sub:
+                continue
+            if action == "add":
+                existing = {sn["node_id"] for sn in db.get_sub_nodes(sub_id)}
+                expire_ms = 0
+                if sub.get("expire_at"):
+                    try:
+                        expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
+                    except Exception:
+                        pass
+                for node_id in node_ids:
+                    if node_id in existing:
+                        continue
+                    node = db.get_node(node_id)
+                    if not node:
+                        continue
+                    try:
+                        client_uuid = str(uuid.uuid4())
+                        xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
+                        client = xui.make_client(sub_id, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "")
+                        ok = xui.add_client(node["inbound_id"], client)
+                        if ok:
+                            db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
+                        else:
+                            errors.append(f"{sub_id}/node {node_id}: failed")
+                    except Exception as e:
+                        errors.append(f"{sub_id}/node {node_id}: {e}")
+            elif action == "remove":
+                snodes = db.get_sub_nodes(sub_id)
+                for node_id in node_ids:
+                    sn = next((s for s in snodes if s["node_id"] == node_id), None)
+                    if not sn:
+                        continue
+                    try:
+                        xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                        xui.delete_client(sn["inbound_id"], sn["client_uuid"])
+                    except Exception:
+                        pass
+                    db.remove_sub_node(sub_id, node_id)
+        return jsonify({"ok": True, "errors": errors})
+
+    @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/stats")
+    def api_sub_stats(sub_id):
+        return jsonify(db.get_stats(sub_id))
+
+    @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/qr")
+    def api_sub_qr(sub_id):
+        base_url = BASE_URL or request.host_url.rstrip("/")
+        sub_url = f"{base_url}/sub/{sub_id}"
+        qr = qrcode.QRCode(box_size=6, border=2)
+        qr.add_data(sub_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="#00e5a0", back_color="#1a1d2e")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        return Response(buf.read(), content_type="image/png")
+
+    @app.route(f"/{panel_path}/api/nodes")
+    def api_nodes_list():
+        nodes = db.get_nodes()
+        for n in nodes:
+            n.pop("password", None)
+        return jsonify(nodes)
+
+    @app.route(f"/{panel_path}/api/nodes", methods=["POST"])
+    def api_nodes_create():
+        data = request.json
+        node_id = db.add_node(
+            data["name"], data["address"], data["username"],
+            data["password"], int(data["inbound_id"]), data.get("proxy_url")
+        )
+        return jsonify({"id": node_id})
+
+    @app.route(f"/{panel_path}/api/nodes/<int:node_id>", methods=["PUT"])
+    def api_node_update(node_id):
+        data = request.json
+        db.update_node(node_id, **data)
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/nodes/<int:node_id>", methods=["DELETE"])
+    def api_node_delete(node_id):
+        db.delete_node(node_id)
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/nodes/<int:node_id>/test")
+    def api_node_test(node_id):
+        node = db.get_node(node_id)
+        if not node:
+            return jsonify({"ok": False, "error": "not found"}), 404
+        try:
+            xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
+            ok = xui.test_connection()
+            inbound = xui.get_inbound(node["inbound_id"]) if ok else None
+            return jsonify({"ok": ok, "protocol": inbound.get("protocol") if inbound else None})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)})
+
+    @app.route(f"/{panel_path}/api/update")
+    def api_update_check():
+        return jsonify(updater.check_update())
+
+    @app.route(f"/{panel_path}/api/update", methods=["POST"])
+    def api_update_apply():
+        threading.Thread(target=updater.apply_update, daemon=True).start()
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/settings")
+    def api_settings_get():
+        env_path = os.getenv("ENV_PATH", os.path.join(base_dir, ".env"))
+        return jsonify(dict(dotenv_values(env_path)))
+
+    @app.route(f"/{panel_path}/api/settings", methods=["POST"])
+    def api_settings_save():
+        env_path = os.getenv("ENV_PATH", os.path.join(base_dir, ".env"))
+        for key, val in request.json.items():
+            set_key(env_path, key, str(val))
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/restart", methods=["POST"])
+    def api_restart():
+        try:
+            subprocess.Popen(["systemctl", "restart", "ghostgate"])
+        except Exception:
+            def _reexec():
+                time.sleep(1)
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+            threading.Thread(target=_reexec, daemon=True).start()
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/logs")
+    def api_logs():
+        log_file = os.getenv("LOG_FILE", "/var/log/ghostgate.log")
+        try:
+            with open(log_file) as f:
+                lines = f.readlines()[-200:]
+            return "".join(lines), 200, {"Content-Type": "text/plain"}
+        except Exception:
+            return "", 200, {"Content-Type": "text/plain"}
+
+    @app.route(f"/{panel_path}/api/logs/stream")
+    def api_logs_stream():
+        log_file = os.getenv("LOG_FILE", "/var/log/ghostgate.log")
+        def _gen():
+            try:
+                with open(log_file) as f:
+                    f.seek(0, 2)
+                    while True:
+                        line = f.readline()
+                        if line:
+                            yield f"data: {line.rstrip()}\n\n"
+                        else:
+                            time.sleep(0.5)
+            except Exception:
+                pass
+        return Response(_gen(), content_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+    def _err(code):
+        if request.path.startswith(f"/{panel_path}"):
+            return _err_pages.get(code, ""), code
+        return "", code
+
+    @app.errorhandler(400)
+    def err400(e):
+        return _err(400)
+
+    @app.errorhandler(403)
+    def err403(e):
+        return _err(403)
+
+    @app.errorhandler(404)
+    def err404(e):
+        return _err(404)
+
+    @app.errorhandler(405)
+    def err405(e):
+        return _err(405)
+
+    @app.errorhandler(500)
+    def err500(e):
+        return _err(500)

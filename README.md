@@ -1,0 +1,220 @@
+# GhostGate - VPN Subscription Panel
+
+**[📖 فارسی / Persian](README_FA.md)**
+
+GhostGate is a sales and subscription management panel for [3x-ui](https://github.com/MHSanaei/3x-ui) VPN panels. It provides a Telegram bot for managing subscriptions, a web admin panel, and automatic traffic synchronization across multiple nodes.
+
+## Features
+
+- **Multi-node support** - Manage subscriptions across multiple 3x-ui servers with shared data limits
+- **Telegram bot** - Create, edit, delete, and monitor subscriptions via bot commands
+- **Web admin panel** - Real-time system monitoring, subscription management, node management, logs
+- **Auto sync** - Background worker syncs traffic usage and enforces data/expiry limits
+- **Subscription links** - Standard VLESS subscription URLs with QR codes
+- **External proxy support** - Respects 3x-ui external proxy configurations for CDN setups
+- **Compiled binary** - Linux amd64 (Ubuntu 22.04+ compatible), no Python required on server
+- **systemd service** - Automated start, restart, logging
+- **Auto-update** - Automatic binary updates via GitHub releases
+- **Easy installation** - One-command setup script with interactive configuration
+
+## Quick Start
+
+```bash
+wget https://github.com/frenchtoblerone54/ghostgate/releases/latest/download/install.sh -O install.sh
+chmod +x install.sh
+sudo ./install.sh
+```
+
+Save the panel URL shown at the end — it is your admin panel access path.
+
+## Bot Commands
+
+```
+/create [--comment Name] [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none]
+/delete <id or comment>
+/stats <id or comment>
+/list [page]
+/edit <id or comment> [--comment X] [--data GB] [--days N] [--ip N]
+/nodes
+```
+
+## Configuration
+
+All settings are stored in `/opt/ghostgate/.env`. They can also be edited from the Settings page in the web panel (restart required for changes to take effect).
+
+| Variable | Default | Description |
+|---|---|---|
+| `BASE_URL` | | Public URL of your server (e.g. `https://your-domain.com`) |
+| `BOT_TOKEN` | | Telegram bot token from @BotFather |
+| `ADMIN_ID` | | Your Telegram user ID |
+| `PANEL_PATH` | auto-generated | Secret path for the web panel |
+| `HOST` | `127.0.0.1` | Listen host |
+| `PORT` | `5000` | Listen port |
+| `SYNC_INTERVAL` | `20` | Traffic sync interval in seconds |
+| `BOT_PROXY` | | HTTP proxy for Telegram bot (optional) |
+| `DB_PATH` | `/opt/ghostgate/ghostgate.db` | SQLite database path |
+| `LOG_FILE` | `/var/log/ghostgate.log` | Log file path |
+| `AUTO_UPDATE` | `false` | Enable automatic binary updates |
+| `UPDATE_CHECK_INTERVAL` | `3600` | Seconds between update checks |
+
+## REST API
+
+The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the secret panel path — no separate authentication token is required. The same API is used by the web panel itself.
+
+### Subscriptions
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/subscriptions` | List subscriptions. Query params: `page`, `per_page`, `search` |
+| `POST` | `/api/subscriptions` | Create subscription and add to nodes |
+| `GET` | `/api/subscriptions/<id>` | Get subscription with node list |
+| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit` |
+| `DELETE` | `/api/subscriptions/<id>` | Delete subscription and remove clients from all nodes |
+| `GET` | `/api/subscriptions/<id>/stats` | Get traffic stats |
+| `GET` | `/api/subscriptions/<id>/qr` | QR code PNG for the subscription link |
+| `POST` | `/api/subscriptions/<id>/nodes` | Add node(s) to an existing subscription |
+| `DELETE` | `/api/subscriptions/<id>/nodes/<node_id>` | Remove a node from a subscription |
+
+**Create subscription — request body:**
+```json
+{
+  "comment": "John Doe",
+  "data_gb": 10,
+  "days": 30,
+  "ip_limit": 2,
+  "node_ids": [1, 2]
+}
+```
+
+**Create subscription — response:**
+```json
+{
+  "id": "abc123...",
+  "uuid": "xxxxxxxx-...",
+  "url": "https://your-domain.com/sub/abc123...",
+  "errors": []
+}
+```
+
+The `errors` array lists any nodes that failed to receive the client — the subscription is still created in the database.
+
+### Nodes
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/nodes` | List all nodes (password omitted) |
+| `POST` | `/api/nodes` | Add a node |
+| `PUT` | `/api/nodes/<id>` | Update node fields |
+| `DELETE` | `/api/nodes/<id>` | Delete a node |
+| `GET` | `/api/nodes/<id>/test` | Test connection and inbound reachability |
+
+**Add node — request body:**
+```json
+{
+  "name": "Germany 1",
+  "address": "http://1.2.3.4:54321",
+  "username": "admin",
+  "password": "secret",
+  "inbound_id": 1,
+  "proxy_url": null
+}
+```
+
+**Add node(s) to subscription — request body:**
+```json
+{ "node_ids": [1, 2] }
+```
+
+Nodes already assigned to the subscription are silently skipped.
+
+### Bulk Operations
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/bulk/nodes` | Add or remove a node across multiple subscriptions |
+
+**Request body:**
+```json
+{
+  "sub_ids": ["abc123", "def456"],
+  "node_ids": [1],
+  "action": "add"
+}
+```
+
+`action` is either `"add"` or `"remove"`. Returns `{"ok": true, "errors": [...]}`.
+
+### Other
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/status` | System metrics (CPU, RAM, disk, network, load) |
+| `GET` | `/api/settings` | Get all `.env` config values |
+| `POST` | `/api/settings` | Save config values (restart required for most changes) |
+| `POST` | `/api/restart` | Restart the GhostGate service |
+| `GET` | `/api/logs` | Last 200 log lines (plain text) |
+| `GET` | `/api/logs/stream` | Live log stream (SSE) |
+
+### Subscription Link
+
+The end-user subscription URL is public and requires no authentication:
+
+```
+https://your-domain.com/sub/<id>
+```
+
+This returns a base64-encoded VLESS config list compatible with standard VPN clients.
+
+## nginx Configuration
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600;
+        proxy_send_timeout 3600;
+        proxy_buffering off;
+    }
+}
+```
+
+## systemd Management
+
+```bash
+sudo systemctl status ghostgate
+sudo systemctl restart ghostgate
+sudo systemctl stop ghostgate
+sudo journalctl -u ghostgate -f
+```
+
+## Building from Source
+
+```bash
+pip install -r requirements.txt pyinstaller
+./build/build.sh
+```
+
+Or using Docker (recommended for Ubuntu 22.04 GLIBC compatibility):
+
+```bash
+./build/build-docker.sh
+```
+
+Binary will be created in `dist/`.
+
+## License
+
+MIT License - See LICENSE file for details

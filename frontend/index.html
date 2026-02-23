@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GhostGate Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+--bg:#0d1117;
+--bg2:#111827;
+--sidebar:#0a0f1a;
+--card:#161b27;
+--card2:#1c2333;
+--border:#1e2d3d;
+--border2:#243447;
+--accent:#00e5a0;
+--accent-dim:rgba(0,229,160,0.1);
+--accent-border:rgba(0,229,160,0.2);
+--accent-glow:rgba(0,229,160,0.15);
+--danger:#ef4444;
+--danger-dim:rgba(239,68,68,0.1);
+--warning:#f59e0b;
+--warning-dim:rgba(245,158,11,0.1);
+--blue:#3b82f6;
+--blue-dim:rgba(59,130,246,0.1);
+--text:#c9d8e8;
+--text2:#8ba3bc;
+--text3:#4a6380;
+--radius:10px;
+--radius-sm:7px;
+--shadow:0 4px 24px rgba(0,0,0,0.4);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
+.sidebar{width:188px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;transition:transform 0.3s}
+.sidebar-brand{padding:20px 16px 16px;border-bottom:1px solid var(--border)}
+.sidebar-brand-name{font-size:1.05em;font-weight:800;color:#fff;letter-spacing:-0.3px;display:flex;align-items:center;gap:8px}
+.brand-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);flex-shrink:0}
+.sidebar-brand-sub{font-size:0.72em;color:var(--text3);font-weight:500;margin-top:3px;padding-left:16px}
+.sidebar-nav{flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);cursor:pointer;font-size:0.88em;font-weight:600;color:var(--text2);transition:all 0.15s;border:none;background:none;width:100%;text-align:left;font-family:'Outfit',sans-serif}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,0.04)}
+.nav-item.active{color:#0d1117;background:var(--accent);font-weight:700}
+.nav-item.active svg{opacity:1}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.7}
+.sidebar-footer{padding:10px;border-top:1px solid var(--border)}
+.main{flex:1;margin-left:188px;min-height:100vh}
+.main-body{padding:22px 26px;max-width:1500px}
+.page{display:none}.page.active{display:block}
+.page-title{font-size:1.1em;font-weight:800;color:#fff;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+.gauges{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.gauge-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;transition:border-color 0.2s}
+.gauge-card:hover{border-color:var(--border2)}
+.gauge-svg{width:100px;height:100px}
+.gauge-svg circle{fill:none;stroke-linecap:round}
+.gauge-track{stroke:rgba(255,255,255,0.06);stroke-width:6}
+.gauge-fill{stroke:var(--accent);stroke-width:6;transition:stroke-dasharray 0.9s cubic-bezier(.4,0,.2,1),stroke 0.3s}
+.gauge-label-wrap{text-align:center}
+.gauge-pct{font-size:1.25em;font-weight:800;fill:#fff;font-family:'Outfit',sans-serif}
+.gauge-info{font-size:0.76em;color:var(--text2);font-weight:500;line-height:1.4;text-align:center}
+.gauge-title{font-size:0.82em;font-weight:700;color:var(--text);text-align:center;margin-bottom:2px}
+.cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius)}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-title{font-size:0.9em;font-weight:700;color:var(--text)}
+.card-body{padding:14px 18px}
+.card-actions{display:flex;border-top:1px solid var(--border)}
+.card-action{flex:1;padding:10px 8px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.78em;font-weight:700;color:var(--text2);cursor:pointer;background:none;border:none;border-right:1px solid var(--border);font-family:'Outfit',sans-serif;transition:all 0.15s}
+.card-action:last-child{border-right:none}
+.card-action:hover{color:var(--accent);background:var(--accent-dim)}
+.card-action svg{width:13px;height:13px}
+.svc-running{display:flex;align-items:center;gap:6px;font-size:0.82em;font-weight:700;color:var(--accent)}
+.svc-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:blink 2.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.5}}
+.svc-dot.offline{background:var(--danger);box-shadow:0 0 8px var(--danger);animation:none}
+.speed-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.speed-label{font-size:0.72em;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:5px}
+.speed-val{font-size:1em;font-weight:700;color:var(--text);display:flex;align-items:center;gap:5px}
+.arrow-up{color:var(--accent)}.arrow-dn{color:#60a5fa}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:0.75em;font-weight:700;border:1px solid}
+.badge-green{color:var(--accent);border-color:var(--accent-border);background:var(--accent-dim)}
+.badge-red{color:var(--danger);border-color:rgba(239,68,68,0.25);background:var(--danger-dim)}
+.badge-muted{color:var(--text2);border-color:var(--border2);background:rgba(255,255,255,0.03)}
+.badge-blue{color:var(--blue);border-color:rgba(59,130,246,0.25);background:var(--blue-dim)}
+.badge-yellow{color:var(--warning);border-color:rgba(245,158,11,0.25);background:var(--warning-dim)}
+.badges{display:flex;gap:7px;flex-wrap:wrap}
+.stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border)}
+.stat-row:last-child{border-bottom:none}
+.stat-k{font-size:0.8em;color:var(--text2);font-weight:600}
+.stat-v{font-size:0.88em;font-weight:700;color:var(--text)}
+.page-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.search-wrap{flex:1;min-width:180px;position:relative;max-width:340px}
+.search-wrap input{width:100%;padding:9px 14px 9px 34px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'Outfit',sans-serif;font-size:0.88em;font-weight:500;transition:border-color 0.15s}
+.search-wrap input:focus{outline:none;border-color:var(--border2)}
+.search-wrap input::placeholder{color:var(--text3)}
+.search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;width:15px;height:15px}
+.btn{padding:8px 16px;border-radius:var(--radius-sm);border:none;font-size:0.84em;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-accent{background:var(--accent);color:#0d1117}
+.btn-accent:hover{background:#00cc8e;box-shadow:0 0 18px var(--accent-glow)}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(239,68,68,0.2);padding:6px 11px;font-size:0.8em}
+.btn-danger:hover{background:var(--danger-dim)}
+.btn-icon{background:transparent;color:var(--text2);border:1px solid var(--border);padding:6px 8px}
+.btn-icon:hover{color:var(--accent);border-color:var(--accent-border)}
+.btn-sm{padding:5px 11px;font-size:0.8em}
+.pag{display:flex;align-items:center;gap:5px}
+.pag-btn{width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:0.82em;font-weight:700;font-family:'Outfit',sans-serif;transition:all 0.15s}
+.pag-btn:hover:not([disabled]){border-color:var(--accent-border);color:var(--accent)}
+.pag-btn.cur{background:var(--accent);border-color:var(--accent);color:#0d1117}
+.pag-btn[disabled]{opacity:0.3;cursor:default;pointer-events:none}
+.pag-dots{color:var(--text3);font-size:0.82em;padding:0 3px}
+.pag-info{font-size:0.8em;color:var(--text2);font-weight:600;padding:0 4px}
+.table-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;padding:10px 14px;font-size:0.74em;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:0.87em;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(255,255,255,0.015)}
+.tbl-id{font-family:'JetBrains Mono',monospace;font-size:0.8em;color:var(--accent);font-weight:500}
+.tbl-comment{font-weight:700;color:var(--text)}
+.prog{display:flex;align-items:center;gap:8px}
+.prog-bar{width:70px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;flex-shrink:0;overflow:hidden}
+.prog-fill{height:100%;border-radius:2px;background:var(--accent);transition:width 0.3s}
+.prog-fill.w{background:var(--warning)}.prog-fill.d{background:var(--danger)}
+.prog-txt{font-size:0.78em;color:var(--text2);font-weight:600;white-space:nowrap}
+.tbl-actions{display:flex;gap:5px;align-items:center}
+.empty-state{padding:40px;text-align:center;color:var(--text2)}
+.empty-state p{font-size:0.88em;font-weight:600}
+.alert{padding:10px 16px;border-radius:var(--radius-sm);font-size:0.84em;font-weight:700;display:none;align-items:center;gap:8px;animation:fadein 0.2s ease;margin-bottom:12px}
+.alert.show{display:flex}
+.alert.ok{background:var(--accent-dim);border:1px solid var(--accent-border);color:var(--accent)}
+.alert.err{background:var(--danger-dim);border:1px solid rgba(239,68,68,0.25);color:var(--danger)}
+@keyframes fadein{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.6)}
+.modal.wide{width:580px}
+.modal-hd{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-hd h3{font-size:0.95em;font-weight:800;color:#fff}
+.modal-x{background:none;border:none;color:var(--text2);cursor:pointer;font-size:1.2em;line-height:1;padding:2px;transition:color 0.15s}
+.modal-x:hover{color:#fff}
+.modal-bd{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.modal-ft{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fl{font-size:0.76em;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px}
+.fi{padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:0.88em;font-family:'Outfit',sans-serif;font-weight:500;transition:border-color 0.15s;width:100%}
+.fi:focus{outline:none;border-color:var(--border2)}
+.fi::placeholder{color:var(--text3)}
+.fi[readonly]{opacity:0.6;cursor:default}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.nodes-list{display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto}
+.node-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer;transition:border-color 0.15s}
+.node-item:hover{border-color:var(--border2)}
+.node-item input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;flex-shrink:0}
+.node-item label{cursor:pointer;flex:1}
+.node-item-name{font-size:0.86em;font-weight:700;color:var(--text)}
+.node-item-addr{font-size:0.74em;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.detail-qr{display:block;margin:0 auto;max-width:190px;border-radius:8px;background:#0a0f1a;padding:10px}
+.detail-url{display:flex;align-items:center;gap:0;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:14px}
+.detail-url code{flex:1;padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:0.75em;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detail-url button{flex-shrink:0;padding:9px 13px;background:none;border:none;border-left:1px solid var(--border);color:var(--text2);font-family:'Outfit',sans-serif;font-size:0.8em;font-weight:700;cursor:pointer;transition:all 0.15s}
+.detail-url button:hover{color:var(--accent)}
+.detail-rows{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm)}
+.detail-row{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border)}
+.detail-row:last-child{border-bottom:none}
+.dk{font-size:0.78em;color:var(--text2);font-weight:600}
+.dv{font-size:0.84em;font-weight:700;color:var(--text)}
+.log-box{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;font-family:'JetBrains Mono',monospace;font-size:0.75em;max-height:560px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--text2);line-height:1.8}
+.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+.sbar-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.sbar-label{font-size:0.73em;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.sbar-val{font-size:1.1em;font-weight:800;color:#fff}
+.topbar{display:none;align-items:center;gap:12px;padding:12px 16px;background:var(--sidebar);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:40}
+.topbar-brand{font-size:0.95em;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;flex:1}
+.hamburger{background:none;border:none;color:var(--text2);cursor:pointer;padding:4px;display:flex;align-items:center;flex-shrink:0}
+.hamburger:hover{color:var(--text)}
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:49}
+.sb-overlay.open{display:block}
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:900px}
+@media(max-width:960px){
+.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}
+.main{margin-left:0}
+.topbar{display:flex}
+.gauges{grid-template-columns:1fr 1fr}.cards-grid{grid-template-columns:1fr}
+.stats-bar{grid-template-columns:1fr 1fr}
+.main-body{padding:16px}
+.cfg-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){.gauges{grid-template-columns:1fr 1fr}.fr{grid-template-columns:1fr}.stats-bar{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+<div class="sidebar-brand">
+<div class="sidebar-brand-name"><div class="brand-dot"></div>GhostGate</div>
+<div class="sidebar-brand-sub">Subscription Manager</div>
+</div>
+<nav class="sidebar-nav">
+<button class="nav-item active" onclick="nav('overview',this)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+Overview
+</button>
+<button class="nav-item" onclick="nav('subs',this)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+Subscriptions
+</button>
+<button class="nav-item" onclick="nav('nodes',this)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+Nodes
+</button>
+<button class="nav-item" onclick="nav('logs',this)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+Logs
+</button>
+<button class="nav-item" onclick="nav('settings',this)">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+Settings
+</button>
+</nav>
+<div class="sidebar-footer">
+<button class="nav-item" onclick="location.reload()">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+Refresh
+</button>
+</div>
+</aside>
+<div class="sb-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
+<div class="main">
+<div class="topbar">
+<button class="hamburger" onclick="toggleSidebar()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+<div class="topbar-brand"><div class="brand-dot"></div>GhostGate</div>
+</div>
+<div class="main-body">
+
+<div class="page active" id="page-overview">
+<div class="gauges">
+<div class="gauge-card">
+<svg class="gauge-svg" viewBox="0 0 100 100">
+<circle class="gauge-track" cx="50" cy="50" r="38" stroke-dasharray="179.1 59.7" transform="rotate(135 50 50)"/>
+<circle class="gauge-fill" id="g-cpu" cx="50" cy="50" r="38" stroke-dasharray="0 238.8" transform="rotate(135 50 50)"/>
+<text class="gauge-pct" x="50" y="53" text-anchor="middle" id="g-cpu-t">0%</text>
+</svg>
+<div class="gauge-title">CPU</div>
+<div class="gauge-info" id="g-cpu-info">-</div>
+</div>
+<div class="gauge-card">
+<svg class="gauge-svg" viewBox="0 0 100 100">
+<circle class="gauge-track" cx="50" cy="50" r="38" stroke-dasharray="179.1 59.7" transform="rotate(135 50 50)"/>
+<circle class="gauge-fill" id="g-ram" cx="50" cy="50" r="38" stroke-dasharray="0 238.8" transform="rotate(135 50 50)"/>
+<text class="gauge-pct" x="50" y="53" text-anchor="middle" id="g-ram-t">0%</text>
+</svg>
+<div class="gauge-title">RAM</div>
+<div class="gauge-info" id="g-ram-info">-</div>
+</div>
+<div class="gauge-card">
+<svg class="gauge-svg" viewBox="0 0 100 100">
+<circle class="gauge-track" cx="50" cy="50" r="38" stroke-dasharray="179.1 59.7" transform="rotate(135 50 50)"/>
+<circle class="gauge-fill" id="g-disk" cx="50" cy="50" r="38" stroke-dasharray="0 238.8" transform="rotate(135 50 50)"/>
+<text class="gauge-pct" x="50" y="53" text-anchor="middle" id="g-disk-t">0%</text>
+</svg>
+<div class="gauge-title">Storage</div>
+<div class="gauge-info" id="g-disk-info">-</div>
+</div>
+<div class="gauge-card">
+<svg class="gauge-svg" viewBox="0 0 100 100">
+<circle class="gauge-track" cx="50" cy="50" r="38" stroke-dasharray="179.1 59.7" transform="rotate(135 50 50)"/>
+<circle class="gauge-fill" id="g-swap" cx="50" cy="50" r="38" stroke-dasharray="0 238.8" transform="rotate(135 50 50)"/>
+<text class="gauge-pct" x="50" y="53" text-anchor="middle" id="g-swap-t">0%</text>
+</svg>
+<div class="gauge-title">Swap</div>
+<div class="gauge-info" id="g-swap-info">-</div>
+</div>
+</div>
+
+<div class="cards-grid">
+<div class="card">
+<div class="card-header">
+<span class="card-title">GhostGate</span>
+<div class="svc-running"><div class="svc-dot" id="svc-dot"></div><span id="svc-txt">Loading...</span></div>
+</div>
+<div class="card-actions">
+<button class="card-action" onclick="nav('logs',document.querySelectorAll('.nav-item')[3])"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>Logs</button>
+<button class="card-action" onclick="nav('subs',document.querySelectorAll('.nav-item')[1])"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>Subscriptions</button>
+<button class="card-action" onclick="nav('nodes',document.querySelectorAll('.nav-item')[2])"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/></svg>Nodes</button>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-title">Subscription Stats</span></div>
+<div class="card-body">
+<div class="stat-row"><span class="stat-k">Total Subscriptions</span><span class="stat-v" id="st-total">-</span></div>
+<div class="stat-row"><span class="stat-k">Active</span><span class="stat-v" id="st-active">-</span></div>
+<div class="stat-row"><span class="stat-k">Nodes Online</span><span class="stat-v" id="st-nodes">-</span></div>
+</div>
+</div>
+</div>
+
+<div class="cards-grid">
+<div class="card">
+<div class="card-header"><span class="card-title">Network Speed</span></div>
+<div class="card-body">
+<div class="speed-grid">
+<div><div class="speed-label">Upload</div><div class="speed-val"><span class="arrow-up">↑</span><span id="spd-up">0 B/s</span></div></div>
+<div><div class="speed-label">Download</div><div class="speed-val"><span class="arrow-dn">↓</span><span id="spd-dn">0 B/s</span></div></div>
+</div>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-title">Total Data</span></div>
+<div class="card-body">
+<div class="speed-grid">
+<div><div class="speed-label">Sent</div><div class="speed-val"><span class="arrow-up">↑</span><span id="tot-sent">-</span></div></div>
+<div><div class="speed-label">Received</div><div class="speed-val"><span class="arrow-dn">↓</span><span id="tot-recv">-</span></div></div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="cards-grid">
+<div class="card">
+<div class="card-header"><span class="card-title">System Load</span></div>
+<div class="card-body"><div class="badges" id="load-badges"></div></div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-title">Recent Accesses</span></div>
+<div class="card-body" style="padding:0">
+<table class="tbl" id="recent-tbl">
+<tbody id="recent-tbody"></tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+
+<div class="page" id="page-subs">
+<div class="stats-bar" id="sub-stats-bar">
+<div class="sbar-item"><div class="sbar-label">Total</div><div class="sbar-val" id="ss-total">-</div></div>
+<div class="sbar-item"><div class="sbar-label">Active</div><div class="sbar-val" id="ss-active">-</div></div>
+<div class="sbar-item"><div class="sbar-label">Nodes</div><div class="sbar-val" id="ss-nodes">-</div></div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+<div class="page-toolbar" style="margin:0;flex:1">
+<div class="search-wrap">
+<svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+<input type="text" id="s-search" placeholder="Search by ID or comment..." oninput="onSearch(this.value)">
+</div>
+<button class="btn btn-accent" onclick="openCreate()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New</button>
+</div>
+<div class="pag" id="pag-top"></div>
+</div>
+<div id="s-alert" class="alert"></div>
+<div id="bulk-bar" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:var(--card2);border:1px solid var(--accent-border);border-radius:var(--radius-sm);margin-bottom:10px;flex-wrap:wrap">
+<span id="bulk-count" style="font-size:0.84em;font-weight:700;color:var(--accent)"></span>
+<select class="fi" id="bulk-node" style="width:auto;flex:1;min-width:140px;max-width:220px"></select>
+<button class="btn btn-accent btn-sm" onclick="bulkNodes('add')">Add to Node</button>
+<button class="btn btn-danger btn-sm" onclick="bulkNodes('remove')">Remove from Node</button>
+<button class="btn btn-ghost btn-sm" onclick="clearBulk()">Clear</button>
+</div>
+<div class="card">
+<div class="table-wrap">
+<table class="tbl">
+<thead><tr><th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAllSubs(this.checked)" style="accent-color:var(--accent)"></th><th>ID</th><th>Comment</th><th>Data</th><th>Expires</th><th>Nodes</th><th>Status</th><th></th></tr></thead>
+<tbody id="s-tbody"></tbody>
+</table>
+</div>
+</div>
+<div style="display:flex;justify-content:flex-end;margin-top:12px"><div class="pag" id="pag-bot"></div></div>
+</div>
+
+<div class="page" id="page-nodes">
+<div class="page-toolbar" style="margin-bottom:14px">
+<button class="btn btn-accent" onclick="openNodeModal(null)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Node</button>
+</div>
+<div id="n-alert" class="alert"></div>
+<div class="card">
+<div class="table-wrap">
+<table class="tbl">
+<thead><tr><th>#</th><th>Name</th><th>Address</th><th>Inbound</th><th>Proxy</th><th>Status</th><th></th></tr></thead>
+<tbody id="n-tbody"></tbody>
+</table>
+</div>
+</div>
+</div>
+
+<div class="page" id="page-logs">
+<div class="page-toolbar" style="margin-bottom:14px">
+<button class="btn btn-ghost" id="live-btn" onclick="toggleLive()">&#9654; Live</button>
+<button class="btn btn-ghost" onclick="document.getElementById('log-el').textContent=''">Clear</button>
+</div>
+<div class="log-box" id="log-el">Loading...</div>
+</div>
+
+<div class="page" id="page-settings">
+<div class="page-title" style="margin-bottom:18px">Settings</div>
+<div id="cfg-alert" class="alert"></div>
+<div class="cfg-grid">
+<div class="card">
+<div class="card-header"><span class="card-title">General</span></div>
+<div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+<div class="fg"><label class="fl">Base URL</label><input class="fi" id="cfg-url" placeholder="https://your-domain.com"></div>
+<div class="fg"><label class="fl">Panel Path</label><input class="fi" id="cfg-path" placeholder="e.g. mySecretPath123"></div>
+<div class="fr">
+<div class="fg"><label class="fl">Host</label><input class="fi" id="cfg-host" placeholder="127.0.0.1"></div>
+<div class="fg"><label class="fl">Port</label><input class="fi" id="cfg-port" type="number" placeholder="5000"></div>
+</div>
+<div class="fg"><label class="fl">Sync Interval (seconds)</label><input class="fi" id="cfg-sync" type="number" placeholder="20"></div>
+<div class="fg"><label class="fl">Log File</label><input class="fi" id="cfg-log" placeholder="/var/log/ghostgate.log"></div>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-title">Telegram Bot</span></div>
+<div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+<div class="fg"><label class="fl">Bot Token</label><input class="fi" id="cfg-token" type="password" placeholder="123456:ABC-DEF..."></div>
+<div class="fg"><label class="fl">Admin User ID</label><input class="fi" id="cfg-admin" placeholder="123456789"></div>
+<div class="fg"><label class="fl">Bot Proxy (optional)</label><input class="fi" id="cfg-proxy" placeholder="http://proxy:3128"></div>
+</div>
+</div>
+</div>
+<div style="display:flex;gap:10px;margin-top:16px;max-width:900px">
+<button class="btn btn-accent" onclick="saveSettings()">Save Changes</button>
+<button class="btn btn-danger" style="border-color:rgba(239,68,68,0.3)" onclick="restartPanel()">Restart Panel</button>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="overlay" id="m-create">
+<div class="modal">
+<div class="modal-hd"><h3 id="mc-title">New Subscription</h3><button class="modal-x" onclick="closeM('m-create')">&#215;</button></div>
+<div class="modal-bd">
+<div id="mc-alert" class="alert"></div>
+<div class="fg"><label class="fl">Comment / Name</label><input class="fi" id="mc-comment" placeholder="e.g. John Doe"></div>
+<div class="fr">
+<div class="fg"><label class="fl">Data Limit (GB, 0=∞)</label><input class="fi" id="mc-data" type="number" value="0" min="0" step="0.1"></div>
+<div class="fg"><label class="fl">Validity (days, 0=∞)</label><input class="fi" id="mc-days" type="number" value="30" min="0"></div>
+</div>
+<div class="fg"><label class="fl">IP Limit (0=∞)</label><input class="fi" id="mc-ip" type="number" value="0" min="0"></div>
+<div class="fg"><label class="fl">Nodes</label><div class="nodes-list" id="mc-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading nodes...</div></div></div>
+</div>
+<div class="modal-ft">
+<button class="btn btn-ghost" onclick="closeM('m-create')">Cancel</button>
+<button class="btn btn-accent" id="mc-submit" onclick="submitCreate()">Create</button>
+</div>
+</div>
+</div>
+
+<div class="overlay" id="m-edit">
+<div class="modal">
+<div class="modal-hd"><h3>Edit Subscription</h3><button class="modal-x" onclick="closeM('m-edit')">&#215;</button></div>
+<div class="modal-bd">
+<div id="me-alert" class="alert"></div>
+<div class="fg"><label class="fl">Comment</label><input class="fi" id="me-comment"></div>
+<div class="fr">
+<div class="fg"><label class="fl">Data Limit (GB)</label><input class="fi" id="me-data" type="number" min="0" step="0.1"></div>
+<div class="fg"><label class="fl">Add Days</label><input class="fi" id="me-days" type="number" value="0" min="0"></div>
+</div>
+<div class="fg"><label class="fl">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
+<div class="fg"><label class="fl">Nodes</label><div class="nodes-list" id="me-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading...</div></div></div>
+</div>
+<div class="modal-ft">
+<button class="btn btn-ghost" onclick="closeM('m-edit')">Cancel</button>
+<button class="btn btn-accent" onclick="submitEdit()">Save</button>
+</div>
+</div>
+</div>
+
+<div class="overlay" id="m-detail">
+<div class="modal wide">
+<div class="modal-hd"><h3 id="md-title">Subscription</h3><button class="modal-x" onclick="closeM('m-detail')">&#215;</button></div>
+<div class="modal-bd">
+<img id="md-qr" class="detail-qr" src="" alt="QR">
+<div style="height:14px"></div>
+<div class="detail-url"><code id="md-url"></code><button id="md-copy" onclick="copyDetailUrl()">Copy</button></div>
+<div class="detail-rows" id="md-rows"></div>
+</div>
+</div>
+</div>
+
+<div class="overlay" id="m-node">
+<div class="modal">
+<div class="modal-hd"><h3 id="mn-title">Add Node</h3><button class="modal-x" onclick="closeM('m-node')">&#215;</button></div>
+<div class="modal-bd">
+<div id="mn-alert" class="alert"></div>
+<div class="fg"><label class="fl">Name</label><input class="fi" id="mn-name" placeholder="e.g. Germany VPS"></div>
+<div class="fg"><label class="fl">3x-ui Address</label><input class="fi" id="mn-addr" placeholder="http://1.2.3.4:54321"></div>
+<div class="fr">
+<div class="fg"><label class="fl">Username</label><input class="fi" id="mn-user" placeholder="admin"></div>
+<div class="fg"><label class="fl">Password</label><input class="fi" id="mn-pass" type="password" placeholder="password"></div>
+</div>
+<div class="fr">
+<div class="fg"><label class="fl">Inbound ID</label><input class="fi" id="mn-inbound" type="number" placeholder="1"></div>
+<div class="fg"><label class="fl">HTTP/HTTPS Proxy</label><input class="fi" id="mn-proxy" placeholder="http://proxy:3128 (optional)"></div>
+</div>
+</div>
+<div class="modal-ft">
+<button class="btn btn-ghost" onclick="closeM('m-node')">Cancel</button>
+<button class="btn btn-ghost" onclick="testNewNode()">Test</button>
+<button class="btn btn-accent" onclick="submitNode()">Save</button>
+</div>
+</div>
+</div>
+
+<script>
+const API="{{prefix}}";
+let sPage=1,sTotalPages=1,sSearch="",sTimer=null;
+let editingSubId=null,editingNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set();
+let logStream=null,liveLog=false;
+let prevNet={sent:0,recv:0,t:0};
+const arc=179.1,circ=238.8;
+
+function toggleSidebar(){
+  document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("sb-overlay").classList.toggle("open");
+}
+function closeSidebar(){
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("sb-overlay").classList.remove("open");
+}
+function nav(name,btn){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+  document.getElementById("page-"+name).classList.add("active");
+  if(btn) btn.classList.add("active");
+  closeSidebar();
+  if(name==="subs") loadSubs();
+  else if(name==="nodes") loadNodes();
+  else if(name==="logs"){ if(logStream){logStream.close();logStream=null;liveLog=false;document.getElementById("live-btn").textContent="▶ Live";} loadLogs(); }
+  else if(name==="settings") loadSettings();
+}
+
+function setG(fid,tid,pct){
+  const f=document.getElementById(fid);
+  const fill=Math.min(pct,100)/100*arc;
+  f.setAttribute("stroke-dasharray",fill+" "+(circ-fill));
+  f.setAttribute("stroke",pct>85?"#ef4444":pct>65?"#f59e0b":"#00e5a0");
+  document.getElementById(tid).textContent=pct.toFixed(1)+"%";
+}
+
+function fmtB(b){
+  if(b<1024) return b+" B";
+  if(b<1048576) return (b/1024).toFixed(1)+" KB";
+  if(b<1073741824) return (b/1048576).toFixed(2)+" MB";
+  return (b/1073741824).toFixed(2)+" GB";
+}
+function fmtMB(mb){ return mb<1024?mb.toFixed(0)+" MB":(mb/1024).toFixed(2)+" GB"; }
+function fmtSpd(b){ return fmtB(b)+"/s"; }
+
+function showAlert(id,msg,type){
+  const el=document.getElementById(id);
+  el.textContent=msg;el.className="alert show "+(type==="ok"?"ok":"err");
+  setTimeout(()=>el.classList.remove("show"),4000);
+}
+
+const evt=new EventSource(API+"/api/stream");
+evt.onmessage=function(e){
+  try{
+    const d=JSON.parse(e.data);
+    const s=d.system;
+    setG("g-cpu","g-cpu-t",s.cpu_percent);
+    document.getElementById("g-cpu-info").textContent="CPU: "+s.cpu_count+" Cores";
+    setG("g-ram","g-ram-t",s.ram_percent);
+    document.getElementById("g-ram-info").textContent=fmtMB(s.ram_used)+" / "+fmtMB(s.ram_total);
+    setG("g-disk","g-disk-t",s.disk_percent);
+    document.getElementById("g-disk-info").textContent=s.disk_used+" GB / "+s.disk_total+" GB";
+    setG("g-swap","g-swap-t",s.swap_percent);
+    document.getElementById("g-swap-info").textContent=fmtMB(s.swap_used)+" / "+fmtMB(s.swap_total);
+    const now=Date.now();
+    if(prevNet.t>0){
+      const dt=(now-prevNet.t)/1000||1;
+      document.getElementById("spd-up").textContent=fmtSpd(Math.max(0,(s.net_sent-prevNet.sent)/dt));
+      document.getElementById("spd-dn").textContent=fmtSpd(Math.max(0,(s.net_recv-prevNet.recv)/dt));
+    }
+    prevNet={sent:s.net_sent,recv:s.net_recv,t:now};
+    document.getElementById("tot-sent").textContent=fmtB(s.net_sent);
+    document.getElementById("tot-recv").textContent=fmtB(s.net_recv);
+    document.getElementById("load-badges").innerHTML=`<span class="badge badge-green">${s.load_1} | ${s.load_5} | ${s.load_15}</span>`;
+    document.getElementById("st-total").textContent=d.total_subs;
+    document.getElementById("st-active").textContent=d.active_subs;
+    document.getElementById("st-nodes").textContent=d.nodes;
+    if(document.getElementById("ss-total")) document.getElementById("ss-total").textContent=d.total_subs;
+    if(document.getElementById("ss-active")) document.getElementById("ss-active").textContent=d.active_subs;
+    if(document.getElementById("ss-nodes")) document.getElementById("ss-nodes").textContent=d.nodes;
+    const dot=document.getElementById("svc-dot");
+    dot.className="svc-dot";
+    document.getElementById("svc-txt").textContent="Running";
+    const rec=d.recent||[];
+    document.getElementById("recent-tbody").innerHTML=rec.length===0
+      ?'<tr><td colspan="2" style="padding:12px 18px;color:var(--text2);font-size:0.82em">No accesses yet</td></tr>'
+      :rec.map(r=>`<tr><td style="padding:8px 18px"><span class="tbl-id">${r.sub_id}</span></td><td style="padding:8px 18px;color:var(--text2);font-size:0.78em;text-align:right">${r.accessed_at}</td></tr>`).join("");
+  }catch(ex){}
+};
+evt.onerror=function(){
+  const dot=document.getElementById("svc-dot");
+  dot.className="svc-dot offline";
+  document.getElementById("svc-txt").textContent="Offline";
+  setTimeout(()=>location.reload(),6000);
+};
+
+function onSearch(v){ clearTimeout(sTimer); sTimer=setTimeout(()=>{ sSearch=v; sPage=1; loadSubs(); },350); }
+
+async function loadSubs(){
+  const qs=new URLSearchParams({page:sPage,per_page:20,search:sSearch||""});
+  const r=await fetch(API+"/api/subscriptions?"+qs).then(x=>x.json());
+  const subs=r.subs||[];
+  sTotalPages=Math.max(1,Math.ceil(r.total/r.per_page));
+  renderPag("pag-top"); renderPag("pag-bot");
+  if(subs.length===0){ document.getElementById("s-tbody").innerHTML='<tr><td colspan="8"><div class="empty-state"><p>No subscriptions found.</p></div></td></tr>'; return; }
+  const nowMs=Date.now();
+  document.getElementById("s-tbody").innerHTML=subs.map(sub=>{
+    const limitB=sub.data_gb>0?sub.data_gb*1073741824:0;
+    const usedB=sub.used_bytes||0;
+    const pct=limitB>0?Math.min(100,Math.round(usedB*100/limitB)):0;
+    const expTs=sub.expire_at?new Date(sub.expire_at).getTime():0;
+    const isExp=expTs>0&&expTs<nowMs;
+    const isOver=limitB>0&&usedB>=limitB;
+    const statusBadge=isExp||isOver?`<span class="badge badge-red">${isExp?"Expired":"Over Limit"}</span>`:'<span class="badge badge-green">Active</span>';
+    const nodes=(sub.node_names||[]).map(n=>`<span class="badge badge-muted" style="font-size:0.72em">${n}</span>`).join(" ")||'<span style="color:var(--text3);font-size:0.8em">—</span>';
+    const progCls=pct>85?" d":pct>65?" w":"";
+    const exactUsed=usedB.toLocaleString()+" bytes ("+((usedB/1073741824).toFixed(4))+" GB)";
+    const exactLimit=limitB>0?limitB.toLocaleString()+" bytes ("+sub.data_gb+" GB)":"Unlimited";
+    const dataTip=`Used: ${exactUsed}\nLimit: ${exactLimit}\n${pct}% consumed`;
+    const dataCol=limitB>0?`<div class="prog" title="${dataTip}"><div class="prog-bar"><div class="prog-fill${progCls}" style="width:${pct}%"></div></div><span class="prog-txt">${(usedB/1073741824).toFixed(1)} / ${sub.data_gb} GB</span></div>`:`<span class="prog-txt" title="${dataTip}">${(usedB/1073741824).toFixed(1)} GB / ∞</span>`;
+    const expStr=sub.expire_at?sub.expire_at.substring(0,10):"Never";
+    const expTip=sub.expire_at?`Exact expiry: ${sub.expire_at}`:"No expiry set";
+    return `<tr>
+<td><input type="checkbox" class="sub-chk" value="${sub.id}" onchange="toggleSubSel('${sub.id}',this.checked)" ${selectedSubs.has(sub.id)?"checked":""} style="accent-color:var(--accent)"></td>
+<td><span class="tbl-id">${sub.id.substring(0,12)}…</span></td>
+<td class="tbl-comment">${sub.comment||'<span style="color:var(--text3)">—</span>'}</td>
+<td>${dataCol}</td>
+<td style="font-size:0.84em;color:var(--text2)" title="${expTip}">${expStr}</td>
+<td>${nodes}</td>
+<td>${statusBadge}</td>
+<td><div class="tbl-actions">
+<button class="btn btn-icon btn-sm" onclick="viewSub('${sub.id}')" title="Details"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+<button class="btn btn-icon btn-sm" onclick="editSub('${sub.id}')" title="Edit"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+<button class="btn btn-danger btn-sm" onclick="deleteSub('${sub.id}')">Del</button>
+</div></td></tr>`;
+  }).join("");
+}
+
+function renderPag(id){
+  const el=document.getElementById(id);
+  let h=`<button class="pag-btn" onclick="goPag(${sPage-1})" ${sPage<=1?"disabled":""}>&#8249;</button>`;
+  const st=Math.max(1,sPage-2),en=Math.min(sTotalPages,sPage+2);
+  if(st>1){ h+=`<button class="pag-btn" onclick="goPag(1)">1</button>`; if(st>2) h+=`<span class="pag-dots">…</span>`; }
+  for(let i=st;i<=en;i++) h+=`<button class="pag-btn${i===sPage?" cur":""}" onclick="goPag(${i})">${i}</button>`;
+  if(en<sTotalPages){ if(en<sTotalPages-1) h+=`<span class="pag-dots">…</span>`; h+=`<button class="pag-btn" onclick="goPag(${sTotalPages})">${sTotalPages}</button>`; }
+  h+=`<button class="pag-btn" onclick="goPag(${sPage+1})" ${sPage>=sTotalPages?"disabled":""}>&#8250;</button>`;
+  el.innerHTML=h;
+}
+
+function goPag(p){ if(p<1||p>sTotalPages) return; sPage=p; loadSubs(); }
+
+async function openCreate(){
+  editingSubId=null;
+  document.getElementById("mc-title").textContent="New Subscription";
+  document.getElementById("mc-comment").value="";
+  document.getElementById("mc-data").value="0";
+  document.getElementById("mc-days").value="30";
+  document.getElementById("mc-ip").value="0";
+  document.getElementById("mc-submit").textContent="Create";
+  const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
+  document.getElementById("mc-nodes").innerHTML=nodes.length===0
+    ?'<div style="color:var(--text2);font-size:0.84em;padding:8px">No nodes configured. Add nodes in the Nodes section first.</div>'
+    :nodes.map(n=>`<label class="node-item"><input type="checkbox" value="${n.id}" ${n.enabled?"checked":""}><div><div class="node-item-name">${n.name}</div><div class="node-item-addr">${n.address}</div></div></label>`).join("");
+  document.getElementById("m-create").classList.add("open");
+}
+
+async function submitCreate(){
+  const comment=document.getElementById("mc-comment").value.trim();
+  const data_gb=parseFloat(document.getElementById("mc-data").value)||0;
+  const days=parseInt(document.getElementById("mc-days").value)||0;
+  const ip_limit=parseInt(document.getElementById("mc-ip").value)||0;
+  const node_ids=[...document.querySelectorAll("#mc-nodes input:checked")].map(x=>parseInt(x.value));
+  const btn=document.getElementById("mc-submit");
+  btn.disabled=true; btn.textContent="Creating…";
+  try{
+    const r=await fetch(API+"/api/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment,data_gb,days,ip_limit,node_ids})}).then(x=>x.json());
+    if(r.errors&&r.errors.length>0) showAlert("mc-alert","Created (with errors): "+r.errors.join("; "),"err");
+    else { closeM("m-create"); loadSubs(); showAlert("s-alert","Subscription created: "+r.id,"ok"); }
+  }catch(ex){ showAlert("mc-alert","Error: "+ex,"err"); }
+  btn.disabled=false; btn.textContent="Create";
+}
+
+async function viewSub(id){
+  const sub=await fetch(API+"/api/subscriptions/"+id).then(r=>r.json());
+  document.getElementById("md-title").textContent=sub.comment||id;
+  document.getElementById("md-qr").src=API+"/api/subscriptions/"+id+"/qr";
+  const baseUrl=window.location.origin;
+  const url=baseUrl+"/sub/"+id;
+  document.getElementById("md-url").textContent=url;
+  const used=(sub.used_bytes||0)/1073741824;
+  const totalStr=sub.data_gb>0?sub.data_gb+" GB":"Unlimited";
+  const expStr=sub.expire_at?sub.expire_at.substring(0,16):"Never";
+  const nodes=(sub.nodes||[]).map(n=>n.name||n).join(", ")||"None";
+  document.getElementById("md-rows").innerHTML=[
+    ["ID",`<span class="tbl-id">${id}</span>`],
+    ["Comment",sub.comment||"—"],
+    ["Data Used",used.toFixed(2)+" GB / "+totalStr],
+    ["Expires",expStr],
+    ["IP Limit",sub.ip_limit||"Unlimited"],
+    ["Nodes",nodes],
+    ["Created",sub.created_at?sub.created_at.substring(0,10):"—"]
+  ].map(([k,v])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${v}</span></div>`).join("");
+  document.getElementById("m-detail").classList.add("open");
+}
+
+function copyDetailUrl(){
+  const url=document.getElementById("md-url").textContent;
+  navigator.clipboard.writeText(url).then(()=>{ const btn=document.getElementById("md-copy"); btn.textContent="Copied!"; setTimeout(()=>btn.textContent="Copy",1800); });
+}
+
+async function editSub(id){
+  editingSubId=id;
+  const [sub, nodes]=await Promise.all([fetch(API+"/api/subscriptions/"+id).then(r=>r.json()),fetch(API+"/api/nodes").then(r=>r.json())]);
+  document.getElementById("me-comment").value=sub.comment||"";
+  document.getElementById("me-data").value=sub.data_gb||0;
+  document.getElementById("me-days").value=0;
+  document.getElementById("me-ip").value=sub.ip_limit||0;
+  const assignedIds=new Set((sub.nodes||[]).map(n=>n.node_id));
+  editingOrigNodes=new Set(assignedIds);
+  document.getElementById("me-nodes").innerHTML=nodes.length?nodes.map(n=>`<label class="node-item"><input type="checkbox" value="${n.id}" ${assignedIds.has(n.id)?"checked":""}><div><div class="node-item-name">${n.name}</div><div class="node-item-addr">${n.address}</div></div></label>`).join(""):'<div style="color:var(--text2);font-size:0.85em;padding:8px">No nodes configured.</div>';
+  document.getElementById("m-edit").classList.add("open");
+}
+
+async function submitEdit(){
+  if(!editingSubId) return;
+  const body={comment:document.getElementById("me-comment").value.trim(),data_gb:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0};
+  const days=parseInt(document.getElementById("me-days").value)||0;
+  if(days>0) body.days=days;
+  const checked=new Set([...document.querySelectorAll("#me-nodes input:checked")].map(i=>parseInt(i.value)));
+  const toAdd=[...checked].filter(id=>!editingOrigNodes.has(id));
+  const toRemove=[...editingOrigNodes].filter(id=>!checked.has(id));
+  const reqs=[fetch(API+"/api/subscriptions/"+editingSubId,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})];
+  if(toAdd.length) reqs.push(fetch(API+"/api/subscriptions/"+editingSubId+"/nodes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({node_ids:toAdd})}));
+  for(const nid of toRemove) reqs.push(fetch(API+"/api/subscriptions/"+editingSubId+"/nodes/"+nid,{method:"DELETE"}));
+  await Promise.all(reqs);
+  closeM("m-edit"); loadSubs(); showAlert("s-alert","Subscription updated","ok");
+}
+
+function toggleSubSel(id, checked){
+  if(checked) selectedSubs.add(id); else selectedSubs.delete(id);
+  updateBulkBar();
+}
+
+function toggleAllSubs(checked){
+  document.querySelectorAll(".sub-chk").forEach(c=>{ c.checked=checked; if(checked) selectedSubs.add(c.value); else selectedSubs.delete(c.value); });
+  updateBulkBar();
+}
+
+function clearBulk(){
+  selectedSubs.clear();
+  document.querySelectorAll(".sub-chk").forEach(c=>c.checked=false);
+  document.getElementById("chk-all").checked=false;
+  updateBulkBar();
+}
+
+async function updateBulkBar(){
+  const n=selectedSubs.size;
+  document.getElementById("bulk-bar").style.display=n>0?"flex":"none";
+  document.getElementById("bulk-count").textContent=n+" selected";
+  if(n>0&&!document.getElementById("bulk-node").options.length){
+    const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
+    document.getElementById("bulk-node").innerHTML=nodes.map(nd=>`<option value="${nd.id}">${nd.name}</option>`).join("");
+  }
+}
+
+async function bulkNodes(action){
+  const node_id=parseInt(document.getElementById("bulk-node").value);
+  if(!node_id) return;
+  const r=await fetch(API+"/api/bulk/nodes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],node_ids:[node_id],action})}).then(x=>x.json());
+  const msg=action==="add"?"Added to node":"Removed from node";
+  loadSubs();
+  showAlert("s-alert",r.errors&&r.errors.length?msg+" (with errors): "+r.errors.join("; "):msg,"ok");
+}
+
+async function deleteSub(id){
+  if(!confirm("Delete this subscription and remove from all nodes?")) return;
+  await fetch(API+"/api/subscriptions/"+id,{method:"DELETE"});
+  loadSubs(); showAlert("s-alert","Deleted","ok");
+}
+
+async function loadNodes(){
+  const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
+  if(nodes.length===0){ document.getElementById("n-tbody").innerHTML='<tr><td colspan="7"><div class="empty-state"><p>No nodes configured. Add a 3x-ui panel to get started.</p></div></td></tr>'; return; }
+  document.getElementById("n-tbody").innerHTML=nodes.map(n=>`<tr>
+<td style="color:var(--text2)">${n.id}</td>
+<td style="font-weight:700">${n.name}</td>
+<td><span style="font-family:'JetBrains Mono',monospace;font-size:0.78em;color:var(--text2)">${n.address}</span></td>
+<td><span class="badge badge-muted">${n.inbound_id}</span></td>
+<td>${n.proxy_url?`<span class="badge badge-blue" style="font-size:0.72em">Proxy</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+<td><span class="badge ${n.enabled?"badge-green":"badge-red"}">${n.enabled?"Enabled":"Disabled"}</span></td>
+<td><div class="tbl-actions">
+<button class="btn btn-icon btn-sm" onclick="testNodeId(${n.id})">Test</button>
+<button class="btn btn-icon btn-sm" onclick="openNodeModal(${n.id})" title="Edit"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+<button class="btn btn-danger btn-sm" onclick="deleteNode(${n.id})">Del</button>
+</div></td></tr>`).join("");
+}
+
+function openNodeModal(id){
+  editingNodeId=id;
+  document.getElementById("mn-title").textContent=id?"Edit Node":"Add Node";
+  if(!id){ ["mn-name","mn-addr","mn-user","mn-pass","mn-proxy"].forEach(x=>document.getElementById(x).value=""); document.getElementById("mn-inbound").value="1"; }
+  document.getElementById("m-node").classList.add("open");
+}
+
+async function submitNode(){
+  const body={name:document.getElementById("mn-name").value.trim(),address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,inbound_id:parseInt(document.getElementById("mn-inbound").value)||1,proxy_url:document.getElementById("mn-proxy").value.trim()||null};
+  if(!body.name||!body.address||!body.username||!body.password){ showAlert("mn-alert","Name, address, username and password are required","err"); return; }
+  if(editingNodeId){ await fetch(API+"/api/nodes/"+editingNodeId,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
+  else{ await fetch(API+"/api/nodes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
+  closeM("m-node"); loadNodes(); showAlert("n-alert","Node saved","ok");
+}
+
+async function testNewNode(){
+  const body={name:"_test",address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,inbound_id:parseInt(document.getElementById("mn-inbound").value)||1,proxy_url:document.getElementById("mn-proxy").value.trim()||null};
+  const r=await fetch(API+"/api/nodes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(x=>x.json());
+  const tr=await fetch(API+"/api/nodes/"+r.id+"/test").then(x=>x.json());
+  await fetch(API+"/api/nodes/"+r.id,{method:"DELETE"});
+  showAlert("mn-alert",tr.ok?`Connected! Protocol: ${tr.protocol||"unknown"}`:`Failed: ${tr.error||"unreachable"}`,tr.ok?"ok":"err");
+}
+
+async function testNodeId(id){
+  const r=await fetch(API+"/api/nodes/"+id+"/test").then(x=>x.json());
+  showAlert("n-alert",r.ok?`Node ${id} connected (${r.protocol||"ok"})`:`Node ${id} failed: ${r.error||"error"}`,r.ok?"ok":"err");
+}
+
+async function deleteNode(id){
+  if(!confirm("Delete this node?")) return;
+  await fetch(API+"/api/nodes/"+id,{method:"DELETE"});
+  loadNodes(); showAlert("n-alert","Node deleted","ok");
+}
+
+async function loadLogs(){
+  const t=await fetch(API+"/api/logs").then(r=>r.text());
+  const el=document.getElementById("log-el");
+  el.textContent=t; el.scrollTop=el.scrollHeight;
+}
+
+function toggleLive(){
+  const btn=document.getElementById("live-btn");
+  if(liveLog){ if(logStream){logStream.close();logStream=null;} liveLog=false; btn.textContent="▶ Live"; }
+  else{
+    liveLog=true; btn.textContent="⏸ Stop Live"; loadLogs();
+    logStream=new EventSource(API+"/api/logs/stream");
+    logStream.onmessage=function(e){ const el=document.getElementById("log-el"); el.textContent+=e.data+"\n"; el.scrollTop=el.scrollHeight; };
+    logStream.onerror=function(){ liveLog=false; btn.textContent="▶ Live"; };
+  }
+}
+
+async function loadSettings(){
+  const s=await fetch(API+"/api/settings").then(r=>r.json());
+  document.getElementById("cfg-url").value=s.BASE_URL||"";
+  document.getElementById("cfg-path").value=s.PANEL_PATH||"";
+  document.getElementById("cfg-host").value=s.HOST||"";
+  document.getElementById("cfg-port").value=s.PORT||"";
+  document.getElementById("cfg-sync").value=s.SYNC_INTERVAL||"20";
+  document.getElementById("cfg-log").value=s.LOG_FILE||"";
+  document.getElementById("cfg-token").value=s.BOT_TOKEN||"";
+  document.getElementById("cfg-admin").value=s.ADMIN_ID||"";
+  document.getElementById("cfg-proxy").value=s.BOT_PROXY||"";
+}
+async function saveSettings(){
+  const body={
+    BASE_URL:document.getElementById("cfg-url").value.trim(),
+    PANEL_PATH:document.getElementById("cfg-path").value.trim(),
+    HOST:document.getElementById("cfg-host").value.trim(),
+    PORT:document.getElementById("cfg-port").value.trim(),
+    SYNC_INTERVAL:document.getElementById("cfg-sync").value.trim(),
+    LOG_FILE:document.getElementById("cfg-log").value.trim(),
+    BOT_TOKEN:document.getElementById("cfg-token").value.trim(),
+    ADMIN_ID:document.getElementById("cfg-admin").value.trim(),
+    BOT_PROXY:document.getElementById("cfg-proxy").value.trim()
+  };
+  Object.keys(body).forEach(k=>{if(!body[k])delete body[k];});
+  await fetch(API+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  showAlert("cfg-alert","Saved — restart required for changes to take effect","ok");
+}
+async function restartPanel(){
+  if(!confirm("Restart GhostGate? The panel will be briefly unavailable."))return;
+  const newPath=document.getElementById("cfg-path").value.trim();
+  await fetch(API+"/api/restart",{method:"POST"});
+  showAlert("cfg-alert","Restart triggered — reconnecting…","ok");
+  setTimeout(()=>{
+    if(newPath&&"/"+newPath!==API) location.href="/"+newPath+"/";
+    else location.reload();
+  },4000);
+}
+
+function closeM(id){ document.getElementById(id).classList.remove("open"); }
+document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",function(e){ if(e.target===this) this.classList.remove("open"); }));
+</script>
+</body>
+</html>

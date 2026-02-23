@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>{{ comment }} — GhostGate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+--bg:#0d1117;
+--card:#161b27;
+--card2:#1c2333;
+--border:#1e2d3d;
+--accent:#00e5a0;
+--accent-dim:rgba(0,229,160,0.08);
+--accent-glow:rgba(0,229,160,0.2);
+--danger:#ef4444;
+--warning:#f59e0b;
+--text:#e2e8f0;
+--text-muted:#5c7a9a;
+--radius:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background-image:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(0,229,160,0.07) 0%,transparent 70%)}
+.card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.5)}
+.card-header{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:9px}
+.brand-icon{width:22px;height:22px;position:relative;display:flex;align-items:center;justify-content:center}
+.brand-pulse{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 var(--accent-glow);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,229,160,0.4)}70%{box-shadow:0 0 0 8px rgba(0,229,160,0)}100%{box-shadow:0 0 0 0 rgba(0,229,160,0)}}
+.brand-name{font-size:0.78em;font-weight:700;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase}
+.status-badge{padding:4px 12px;border-radius:20px;font-size:0.76em;font-weight:700;letter-spacing:0.3px}
+.status-active{background:rgba(0,229,160,0.12);color:var(--accent);border:1px solid rgba(0,229,160,0.25)}
+.status-expired{background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.25)}
+.status-over{background:rgba(245,158,11,0.12);color:var(--warning);border:1px solid rgba(245,158,11,0.25)}
+.qr-section{padding:28px 22px 20px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.qr-wrap{background:#0a0f1a;border-radius:12px;padding:14px;border:1px solid var(--border)}
+.qr-wrap img{display:block;width:180px;height:180px}
+.sub-title{font-size:1.05em;font-weight:700;color:var(--text);text-align:center}
+.url-section{margin:0 22px 18px;background:var(--card2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:0;overflow:hidden}
+.url-text{flex:1;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:0.72em;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.copy-btn{flex-shrink:0;padding:10px 14px;background:none;border:none;border-left:1px solid var(--border);color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:0.78em;font-weight:700;cursor:pointer;transition:all 0.18s;white-space:nowrap}
+.copy-btn:hover{color:var(--accent);background:var(--accent-dim)}
+.copy-btn.copied{color:var(--accent)}
+.info-grid{padding:0 22px 22px;display:flex;flex-direction:column;gap:12px}
+.info-card{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.info-label{font-size:0.75em;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px}
+.info-value{font-size:1em;font-weight:700;color:var(--text)}
+.info-value.danger{color:var(--danger)}
+.info-value.warning{color:var(--warning)}
+.progress-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.progress-label{font-size:0.82em;font-weight:600;color:var(--text)}
+.progress-pct{font-size:0.78em;font-weight:700;color:var(--text-muted)}
+.progress-track{height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;background:var(--accent);transition:width 1s cubic-bezier(.4,0,.2,1)}
+.progress-fill.warn{background:var(--warning)}
+.progress-fill.danger{background:var(--danger)}
+.expire-row{display:flex;align-items:center;justify-content:space-between}
+.expire-val{font-size:1.05em;font-weight:700}
+.expire-val.ok{color:var(--accent)}
+.expire-val.warn{color:var(--warning)}
+.expire-val.bad{color:var(--danger)}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="card-header">
+<div class="brand">
+<div class="brand-icon"><div class="brand-pulse"></div></div>
+<span class="brand-name">GhostGate</span>
+</div>
+{% if is_expired %}
+<span class="status-badge status-expired">Expired</span>
+{% elif is_over_limit %}
+<span class="status-badge status-over">Over Limit</span>
+{% else %}
+<span class="status-badge status-active">Active</span>
+{% endif %}
+</div>
+<div class="qr-section">
+<div class="qr-wrap">
+<img src="data:image/png;base64,{{ qr_b64 }}" alt="Subscription QR">
+</div>
+<div class="sub-title">{{ comment }}</div>
+</div>
+<div class="url-section">
+<code class="url-text" id="sub-url">{{ sub_url }}</code>
+<button class="copy-btn" id="copy-btn" onclick="copyUrl()">Copy</button>
+</div>
+<div class="info-grid">
+<div class="info-card">
+<div class="info-label">Data Usage</div>
+<div class="progress-row">
+<span class="progress-label">{{ data_used_str }} / {{ data_total_str }}</span>
+<span class="progress-pct">{{ data_percent }}%</span>
+</div>
+<div class="progress-track">
+<div class="progress-fill {% if data_percent > 85 %}danger{% elif data_percent > 65 %}warn{% endif %}" style="width:{{ data_percent }}%"></div>
+</div>
+</div>
+<div class="info-card">
+<div class="info-label">Time Remaining</div>
+<div class="expire-row">
+<span class="expire-val {% if is_expired %}bad{% elif expire_str == 'No Expiry' %}ok{% else %}ok{% endif %}">{{ expire_str }}</span>
+</div>
+</div>
+</div>
+</div>
+<script>
+function copyUrl(){
+const url=document.getElementById("sub-url").textContent;
+const btn=document.getElementById("copy-btn");
+navigator.clipboard.writeText(url).then(()=>{btn.textContent="Copied!";btn.classList.add("copied");setTimeout(()=>{btn.textContent="Copy";btn.classList.remove("copied");},2000);});
+}
+</script>
+</body>
+</html>
