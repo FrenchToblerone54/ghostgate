@@ -307,10 +307,11 @@ def register_routes(panel_path):
             try:
                 xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
                 total_limit_bytes = int(max(0, data_gb * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
-                client = xui.make_client(sub_id, client_uuid, expire_ms, ip_limit, sub_id, comment or "", total_limit_bytes)
+                email = f"{sub_id}-{node_id}"
+                client = xui.make_client(email, client_uuid, expire_ms, ip_limit, sub_id, comment or "", total_limit_bytes)
                 ok = xui.add_client(node["inbound_id"], client)
                 if ok:
-                    db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
+                    db.add_sub_node(sub_id, node_id, client_uuid, email)
                 else:
                     errors.append(f"node {node_id}: failed to add client")
             except Exception as e:
@@ -407,10 +408,11 @@ def register_routes(panel_path):
                 client_uuid = str(uuid.uuid4())
                 xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
                 total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
-                client = xui.make_client(sub_id, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
+                email = f"{sub_id}-{node_id}"
+                client = xui.make_client(email, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
                 ok = xui.add_client(node["inbound_id"], client)
                 if ok:
-                    db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
+                    db.add_sub_node(sub_id, node_id, client_uuid, email)
                 else:
                     errors.append(f"node {node_id}: failed to add client")
             except Exception as e:
@@ -459,10 +461,11 @@ def register_routes(panel_path):
                         client_uuid = str(uuid.uuid4())
                         xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
                         total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
-                        client = xui.make_client(sub_id, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
+                        email = f"{sub_id}-{node_id}"
+                        client = xui.make_client(email, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
                         ok = xui.add_client(node["inbound_id"], client)
                         if ok:
-                            db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
+                            db.add_sub_node(sub_id, node_id, client_uuid, email)
                         else:
                             errors.append(f"{sub_id}/node {node_id}: failed")
                     except Exception as e:

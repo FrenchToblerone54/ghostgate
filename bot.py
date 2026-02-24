@@ -110,9 +110,10 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         try:
             xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
             total_limit_bytes = int(data_gb * 1073741824 / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
-            client = xui.make_client(sub_id, client_uuid, expire_ms, ip_limit, sub_id, comment or "", total_limit_bytes)
+            email = f"{sub_id}-{node_id}"
+            client = xui.make_client(email, client_uuid, expire_ms, ip_limit, sub_id, comment or "", total_limit_bytes)
             if xui.add_client(node["inbound_id"], client):
-                db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
+                db.add_sub_node(sub_id, node_id, client_uuid, email)
                 added_nodes.append(node["name"])
         except Exception as e:
             logger.warning(f"create sub node {node_id} error: {e}")

@@ -244,9 +244,10 @@ def cmd_create(args):
         try:
             xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
             total_limit_bytes = int(data_gb * 1073741824 / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
-            client = xui.make_client(sub_id, client_uuid, expire_ms, ip_limit, sub_id, comment, total_limit_bytes)
+            email = f"{sub_id}-{node_id}"
+            client = xui.make_client(email, client_uuid, expire_ms, ip_limit, sub_id, comment, total_limit_bytes)
             ok = xui.add_client(node["inbound_id"], client)
-            if ok: db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
+            if ok: db.add_sub_node(sub_id, node_id, client_uuid, email)
             else: errors.append(f"node {node_id}: failed")
         except Exception as e:
             errors.append(f"node {node_id}: {e}")
