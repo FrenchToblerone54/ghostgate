@@ -226,7 +226,8 @@ def cmd_create(args):
         node_ids = []
     else:
         node_ids = [int(x) for x in node_ids_raw.split(",")]
-    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier)
+    custom_id = opts.get("id") or None
+    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, sub_id=custom_id)
     sub = db.get_sub(sub_id)
     client_uuid = str(uuid.uuid4())
     expire_ms = 0
@@ -348,7 +349,7 @@ def cmd_help(args):
     lines = [
         f"  [{ACC}]list[/] [{MUTED}][--search X][/]                          List all subscriptions",
         f"  [{ACC}]stats[/] [{MUTED}]<id|comment>[/]                         Show detailed subscription info",
-        f"  [{ACC}]create[/] [{MUTED}]--comment X [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none][/]",
+        f"  [{ACC}]create[/] [{MUTED}][--id X] --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none][/]",
         f"  [{ACC}]edit[/] [{MUTED}]<id|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable][/]",
         f"  [{ACC}]delete[/] [{MUTED}]<id|comment>[/]                         Delete subscription",
         f"  [{ACC}]nodes[/]                                       List nodes",
