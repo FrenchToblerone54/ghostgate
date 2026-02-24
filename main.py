@@ -53,13 +53,15 @@ def _migrate(old_db_path, node_id):
     print(f"Migrated {count}/{len(configs)} subscriptions from {old_db_path}")
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] == "update":
+    if "update" in sys.argv[1:]:
+        print(f"Current version: v{updater.VERSION}")
+        print("Checking for updates...")
         info = updater.check_update()
         if not info.get("update_available"):
-            print(f"ghostgate v{info['current']} is up to date")
+            print("Already up to date.")
         else:
-            print(f"Update available: v{info['current']} → v{info['latest']}")
-            print("Applying update...")
+            print(f"Update found: v{info['latest']}")
+            print("Downloading and applying update...")
             updater.apply_update()
             print("Update failed — check logs")
         sys.exit(0)
