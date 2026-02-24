@@ -202,7 +202,7 @@ def register_routes(panel_path):
     BASE_URL = os.getenv("BASE_URL", "")
     base_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(base_dir, "frontend", "index.html")) as f:
-        _panel_html = f.read().replace("{{prefix}}", f"/{panel_path}")
+        _panel_html = f.read().replace("{{prefix}}", f"/{panel_path}").replace("{{version}}", updater.VERSION)
     _err_pages = {}
     for code in [400, 403, 404, 405, 500]:
         fp = os.path.join(base_dir, "frontend", f"{code}.html")
