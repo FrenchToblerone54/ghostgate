@@ -9,7 +9,7 @@ import threading
 import subprocess
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
-from flask import Flask, jsonify, request, Response, render_template_string
+from flask import Flask, jsonify, request, Response, render_template_string, abort
 import psutil
 import qrcode
 from dotenv import dotenv_values, set_key
@@ -120,7 +120,7 @@ def _make_qr_b64(text):
 def sub_page(sub_id):
     sub = db.get_sub(sub_id)
     if not sub:
-        return "Not Found", 404
+        return abort(404)
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
     ua = request.headers.get("User-Agent", "")
     db.log_access(sub_id, ip, ua)
