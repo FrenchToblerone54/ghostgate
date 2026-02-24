@@ -14,7 +14,8 @@ GhostGate is a sales and subscription management panel for [3x-ui](https://githu
 - **External proxy support** - Respects 3x-ui external proxy configurations for CDN setups
 - **Compiled binary** - Linux amd64 (Ubuntu 22.04+ compatible), no Python required on server
 - **systemd service** - Automated start, restart, logging
-- **Auto-update** - Automatic binary updates via GitHub releases
+- **Auto-update** - Automatic binary updates via GitHub releases; manual update via `ghostgate update` or the Settings page
+- **Bulk operations** - Bulk delete, enable, or disable multiple subscriptions at once from the web panel
 - **Easy installation** - One-command setup script with interactive configuration
 
 ## Quick Start
@@ -72,7 +73,7 @@ The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the
 | `GET` | `/api/subscriptions` | List subscriptions. Query params: `page`, `per_page`, `search` |
 | `POST` | `/api/subscriptions` | Create subscription and add to nodes |
 | `GET` | `/api/subscriptions/<id>` | Get subscription with node list |
-| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit` |
+| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled` |
 | `DELETE` | `/api/subscriptions/<id>` | Delete subscription and remove clients from all nodes |
 | `GET` | `/api/subscriptions/<id>/stats` | Get traffic stats |
 | `GET` | `/api/subscriptions/<id>/qr` | QR code PNG for the subscription link |
@@ -136,8 +137,10 @@ Nodes already assigned to the subscription are silently skipped.
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/bulk/nodes` | Add or remove a node across multiple subscriptions |
+| `POST` | `/api/bulk/delete` | Delete multiple subscriptions and remove their clients from all nodes |
+| `POST` | `/api/bulk/toggle` | Enable or disable multiple subscriptions |
 
-**Request body:**
+**`/api/bulk/nodes` request body:**
 ```json
 {
   "sub_ids": ["abc123", "def456"],
@@ -148,16 +151,32 @@ Nodes already assigned to the subscription are silently skipped.
 
 `action` is either `"add"` or `"remove"`. Returns `{"ok": true, "errors": [...]}`.
 
+**`/api/bulk/delete` request body:**
+```json
+{ "sub_ids": ["abc123", "def456"] }
+```
+
+Returns `{"ok": true, "deleted": 2}`.
+
+**`/api/bulk/toggle` request body:**
+```json
+{ "sub_ids": ["abc123", "def456"], "enabled": false }
+```
+
+Returns `{"ok": true}`.
+
 ### Other
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/status` | System metrics (CPU, RAM, disk, network, load) |
+| `GET` | `/api/update` | Check for a binary update. Returns `{current, latest, update_available}` |
+| `POST` | `/api/update` | Download and apply the latest binary update, then restart |
 | `GET` | `/api/settings` | Get all `.env` config values |
 | `POST` | `/api/settings` | Save config values (restart required for most changes) |
 | `POST` | `/api/restart` | Restart the GhostGate service |
 | `GET` | `/api/logs` | Last 200 log lines (plain text) |
-| `GET` | `/api/logs/stream` | Live log stream (SSE) |
+| `GET` | `/api/logs/stream` | Live log stream (SSE, sends `: heartbeat` every 10 s when idle) |
 
 ### Subscription Link
 
@@ -202,6 +221,15 @@ sudo systemctl status ghostgate
 sudo systemctl restart ghostgate
 sudo systemctl stop ghostgate
 sudo journalctl -u ghostgate -f
+```
+
+## CLI Commands
+
+```bash
+ghostgate                  # Start the service (normal mode)
+ghostgate --version        # Print version and exit
+ghostgate --generate-path  # Generate a new random panel path
+ghostgate update           # Check for an update and apply it if available
 ```
 
 ## Building from Source

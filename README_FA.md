@@ -22,7 +22,9 @@
 
 - **سرویس systemd** - شروع خودکار، راه‌اندازی مجدد، لاگ‌نویسی
 
-- **به‌روزرسانی خودکار** - به‌روزرسانی خودکار فایل باینری از طریق انتشارهای GitHub
+- **به‌روزرسانی خودکار** - به‌روزرسانی خودکار فایل باینری از طریق GitHub؛ به‌روزرسانی دستی با `ghostgate update` یا از صفحه Settings
+
+- **عملیات دسته‌جمعی** - حذف، فعال یا غیرفعال کردن چندین اشتراک همزمان از پنل وب
 
 - **نصب آسان** - اسکریپت نصب یک دستوری با تنظیمات تعاملی
 
@@ -79,7 +81,7 @@ sudo ./install.sh
 | `GET` | `/api/subscriptions` | لیست اشتراک‌ها. پارامترها: `page`، `per_page`، `search` |
 | `POST` | `/api/subscriptions` | ایجاد اشتراک و افزودن به نودها |
 | `GET` | `/api/subscriptions/<id>` | دریافت اشتراک همراه با لیست نودها |
-| `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit` |
+| `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit`، `enabled` |
 | `DELETE` | `/api/subscriptions/<id>` | حذف اشتراک و حذف کلاینت از تمام نودها |
 | `GET` | `/api/subscriptions/<id>/stats` | دریافت آمار ترافیک |
 | `GET` | `/api/subscriptions/<id>/qr` | تصویر PNG کد QR برای لینک اشتراک |
@@ -143,8 +145,10 @@ sudo ./install.sh
 | متد | مسیر | توضیح |
 |---|---|---|
 | `POST` | `/api/bulk/nodes` | افزودن یا حذف یک نود از چندین اشتراک به‌صورت همزمان |
+| `POST` | `/api/bulk/delete` | حذف چندین اشتراک و حذف کلاینت‌های آن‌ها از تمام نودها |
+| `POST` | `/api/bulk/toggle` | فعال یا غیرفعال کردن چندین اشتراک |
 
-**بدنه درخواست:**
+**بدنه درخواست `/api/bulk/nodes`:**
 ```json
 {
   "sub_ids": ["abc123", "def456"],
@@ -155,16 +159,32 @@ sudo ./install.sh
 
 `action` باید `"add"` یا `"remove"` باشد. پاسخ: `{"ok": true, "errors": [...]}`.
 
+**بدنه درخواست `/api/bulk/delete`:**
+```json
+{ "sub_ids": ["abc123", "def456"] }
+```
+
+پاسخ: `{"ok": true, "deleted": 2}`.
+
+**بدنه درخواست `/api/bulk/toggle`:**
+```json
+{ "sub_ids": ["abc123", "def456"], "enabled": false }
+```
+
+پاسخ: `{"ok": true}`.
+
 ### سایر
 
 | متد | مسیر | توضیح |
 |---|---|---|
 | `GET` | `/api/status` | متریک‌های سیستم (CPU، RAM، دیسک، شبکه، بار) |
+| `GET` | `/api/update` | بررسی به‌روزرسانی. پاسخ: `{current, latest, update_available}` |
+| `POST` | `/api/update` | دانلود و اعمال آخرین به‌روزرسانی، سپس راه‌اندازی مجدد |
 | `GET` | `/api/settings` | دریافت تمام مقادیر تنظیمات `.env` |
 | `POST` | `/api/settings` | ذخیره مقادیر تنظیمات (بیشتر تغییرات نیاز به راه‌اندازی مجدد دارند) |
 | `POST` | `/api/restart` | راه‌اندازی مجدد سرویس GhostGate |
 | `GET` | `/api/logs` | ۲۰۰ خط آخر لاگ (متن ساده) |
-| `GET` | `/api/logs/stream` | جریان زنده لاگ (SSE) |
+| `GET` | `/api/logs/stream` | جریان زنده لاگ (SSE، هر ۱۰ ثانیه در صورت سکوت `: heartbeat` ارسال می‌شود) |
 
 ### لینک اشتراک
 
@@ -209,6 +229,15 @@ sudo systemctl status ghostgate
 sudo systemctl restart ghostgate
 sudo systemctl stop ghostgate
 sudo journalctl -u ghostgate -f
+```
+
+## دستورات CLI
+
+```bash
+ghostgate                  # اجرای سرویس (حالت معمول)
+ghostgate --version        # نمایش نسخه و خروج
+ghostgate --generate-path  # تولید مسیر تصادفی جدید برای پنل
+ghostgate update           # بررسی به‌روزرسانی و اعمال آن در صورت وجود
 ```
 
 ## بیلد از سورس
