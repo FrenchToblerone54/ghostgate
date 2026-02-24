@@ -373,6 +373,7 @@ Refresh
 <input class="fi" id="bulk-add-days" type="number" min="1" placeholder="days" style="width:66px;padding:5px 8px;font-size:0.82em">
 <button class="btn btn-ghost btn-sm" onclick="bulkExtend('days',1)">+Days</button>
 <button class="btn btn-danger btn-sm" onclick="bulkExtend('days',-1)">-Days</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkNoExpiry()">No Expiry</button>
 <button class="btn btn-danger btn-sm" onclick="bulkDelete()">Delete</button>
 <button class="btn btn-ghost btn-sm" onclick="clearBulk()">Clear</button>
 </div>
@@ -486,8 +487,9 @@ Refresh
 <div class="fg"><label class="fl">Comment</label><input class="fi" id="me-comment"></div>
 <div class="fr">
 <div class="fg"><label class="fl">Data Limit (GB)</label><input class="fi" id="me-data" type="number" min="0" step="0.1"></div>
-<div class="fg"><label class="fl">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0"><button class="btn btn-ghost btn-sm" style="margin-top:6px;width:100%" onclick="setNoExpire()">No Expiry</button></div>
+<div class="fg"><label class="fl">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0"></div>
 </div>
+<button id="me-no-expire-btn" class="btn btn-ghost btn-sm" style="width:100%" onclick="setNoExpire()">Set No Expiry</button>
 <div class="fg"><label class="fl">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="me-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
 <div class="fg"><label class="fl">Nodes</label><div class="nodes-list" id="me-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading...</div></div></div>
@@ -765,7 +767,7 @@ async function editSub(id){
   const [sub, nodes]=await Promise.all([fetch(API+"/api/subscriptions/"+id).then(r=>r.json()),fetch(API+"/api/nodes").then(r=>r.json())]);
   document.getElementById("me-comment").value=sub.comment||"";
   document.getElementById("me-data").value=sub.data_gb||0;
-  document.getElementById("me-days").value=0; document.getElementById("me-days").placeholder=""; document.getElementById("me-days").disabled=false; _removeExpiry=false;
+  document.getElementById("me-days").value=0; document.getElementById("me-days").disabled=false; _removeExpiry=false; document.getElementById("me-no-expire-btn").textContent="Set No Expiry"; document.getElementById("me-no-expire-btn").style.color="";
   document.getElementById("me-ip").value=sub.ip_limit||0;
   document.getElementById("me-sm").value=sub.show_multiplier||1;
   const assignedIds=new Set((sub.nodes||[]).map(n=>n.node_id));
@@ -775,7 +777,7 @@ async function editSub(id){
 }
 
 let _removeExpiry=false;
-function setNoExpire(){ _removeExpiry=true; document.getElementById("me-days").value=0; document.getElementById("me-days").placeholder="No Expiry"; document.getElementById("me-days").disabled=true; }
+function setNoExpire(){ _removeExpiry=true; document.getElementById("me-days").value=0; document.getElementById("me-days").disabled=true; document.getElementById("me-no-expire-btn").textContent="✓ No Expiry Set"; document.getElementById("me-no-expire-btn").style.color="var(--accent)"; }
 async function submitEdit(){
   if(!editingSubId) return;
   const body={comment:document.getElementById("me-comment").value.trim(),data_gb:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
@@ -846,6 +848,13 @@ async function bulkExtend(type,sign=1){
     showAlert("s-alert",(sign>0?"Added ":"Removed ")+days+" days "+(sign>0?"to":"from")+" "+n+" subscriptions","ok");
   }
   loadSubs();
+}
+
+async function bulkNoExpiry(){
+  const n=selectedSubs.size;
+  if(!n) return;
+  await fetch(API+"/api/bulk/extend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],remove_expiry:true})});
+  clearBulk(); loadSubs(); showAlert("s-alert","Removed expiry from "+n+" subscriptions","ok");
 }
 
 async function checkUpdate(){

@@ -313,15 +313,30 @@ def register_routes(panel_path):
                 except Exception:
                     pass
         db.update_sub(sub_id, **updates)
+        sub = db.get_sub(sub_id)
+        snodes = db.get_sub_nodes(sub_id)
         if "enabled" in body:
             enabled_val = bool(body["enabled"])
             if enabled_val:
                 db.reset_sub_node_disabled(sub_id)
-            snodes = db.get_sub_nodes(sub_id)
             for sn in snodes:
                 try:
                     xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
                     xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], enabled_val)
+                except Exception:
+                    pass
+        if any(k in updates for k in ("expire_at", "days", "ip_limit")) or body.get("remove_expiry") or "remove_days" in body:
+            expire_ms = 0
+            if sub and sub.get("expire_at"):
+                try:
+                    expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
+                except Exception:
+                    pass
+            ip_limit = sub.get("ip_limit", 0) if sub else 0
+            for sn in snodes:
+                try:
+                    xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                    xui.update_client_expiry_ip(sn["inbound_id"], sn["client_uuid"], sn["email"], expire_ms, ip_limit)
                 except Exception:
                     pass
         return jsonify({"ok": True})
@@ -442,6 +457,7 @@ def register_routes(panel_path):
         sub_ids = data.get("sub_ids", [])
         add_data_gb = float(data.get("data_gb", 0))
         add_days = int(data.get("days", 0))
+        remove_expiry = bool(data.get("remove_expiry", False))
         for sub_id in sub_ids:
             sub = db.get_sub(sub_id)
             if not sub:
@@ -449,7 +465,9 @@ def register_routes(panel_path):
             updates = {}
             if add_data_gb != 0:
                 updates["data_gb"] = max(0, (sub.get("data_gb") or 0) + add_data_gb)
-            if add_days != 0:
+            if remove_expiry:
+                updates["expire_at"] = None
+            elif add_days != 0:
                 try:
                     base = datetime.fromisoformat(sub["expire_at"]) if sub.get("expire_at") else (datetime.now(timezone.utc) if add_days > 0 else None)
                     if base is not None:
@@ -461,6 +479,20 @@ def register_routes(panel_path):
                         updates["expire_at"] = (datetime.now(timezone.utc) + timedelta(days=add_days)).isoformat()
             if updates:
                 db.update_sub(sub_id, **updates)
+                if remove_expiry or add_days != 0:
+                    updated_sub = db.get_sub(sub_id)
+                    expire_ms = 0
+                    if updated_sub and updated_sub.get("expire_at"):
+                        try:
+                            expire_ms = int(datetime.fromisoformat(updated_sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
+                        except Exception:
+                            pass
+                    for sn in db.get_sub_nodes(sub_id):
+                        try:
+                            xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                            xui.update_client_expiry_ip(sn["inbound_id"], sn["client_uuid"], sn["email"], expire_ms, updated_sub.get("ip_limit", 0))
+                        except Exception:
+                            pass
         return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/bulk/delete", methods=["POST"])

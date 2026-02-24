@@ -171,7 +171,7 @@ Returns `{"ok": true}`.
 { "sub_ids": ["abc123", "def456"], "data_gb": 10, "days": 30 }
 ```
 
-Both `data_gb` and `days` are optional and additive — data is added to the current limit, days are extended from the current expiry (or from now if no expiry is set). **Negative values subtract** — e.g. `"data_gb": -5` removes 5 GB (clamped to 0), `"days": -7` removes 7 days from the current expiry (skipped if no expiry set). Returns `{"ok": true}`.
+Both `data_gb` and `days` are optional and additive — data is added to the current limit, days are extended from the current expiry (or from now if no expiry is set). **Negative values subtract** — e.g. `"data_gb": -5` removes 5 GB (clamped to 0), `"days": -7` removes 7 days from the current expiry (skipped if no expiry set). Pass `"remove_expiry": true` to clear the expiry date (takes priority over `days`). All expiry changes are pushed to 3x-ui nodes immediately. Returns `{"ok": true}`.
 
 ### Other
 

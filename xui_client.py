@@ -72,6 +72,14 @@ class XUIClient:
             "comment": comment or ""
         }
 
+    def update_client_expiry_ip(self, inbound_id, client_uuid, email, expire_ms, ip_limit):
+        client = self.get_client_by_email(inbound_id, email)
+        if not client:
+            return False
+        client["expiryTime"] = expire_ms
+        client["limitIp"] = ip_limit
+        return self.update_client(inbound_id, client_uuid, client)
+
     def update_client_limit(self, inbound_id, client_uuid, email, total_limit_bytes):
         client = self.get_client_by_email(inbound_id, email)
         if not client:
