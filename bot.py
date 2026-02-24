@@ -58,12 +58,14 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text(
         "GhostGate Bot\n\n"
-        "/create [--comment X] [--data GB] [--days N] [--ip N] [--nodes 1,2]\n"
+        "/create [--comment X] [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none]\n"
         "/delete <id or comment>\n"
         "/stats <id or comment>\n"
         "/edit <id or comment> [--comment X] [--data GB] [--days N] [--ip N]\n"
-        "/list [page]\n"
+        "/list [page] — 10 per page\n"
         "/nodes\n"
+        "/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...]\n"
+        "/delnode <id>\n"
     )
 
 async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -228,6 +230,44 @@ async def cmd_edit(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         db.update_sub(sub["id"], **updates)
     await update.message.reply_text(f"Updated: {sub.get('comment') or sub['id']}")
 
+async def cmd_addnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    try:
+        args = shlex.split(" ".join(ctx.args or []))
+    except Exception:
+        args = ctx.args or []
+    opts = _parse_opts(args)
+    name = opts.get("name")
+    addr = opts.get("addr")
+    user = opts.get("user")
+    pwd = opts.get("pass")
+    inbound = int(opts.get("inbound", 1))
+    proxy = opts.get("proxy")
+    if not all([name, addr, user, pwd]):
+        await update.message.reply_text("Usage: /addnode --name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...]")
+        return
+    node_id = db.add_node(name, addr, user, pwd, inbound, proxy)
+    await update.message.reply_text(f"Node added: [{node_id}] {name}\n{addr} — inbound {inbound}")
+
+async def cmd_delnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Usage: /delnode <id>")
+        return
+    try:
+        node_id = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("Node ID must be a number.")
+        return
+    node = db.get_node(node_id)
+    if not node:
+        await update.message.reply_text("Node not found.")
+        return
+    db.delete_node(node_id)
+    await update.message.reply_text(f"Deleted node: [{node_id}] {node['name']}")
+
 async def cmd_nodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update.effective_user.id):
         return
@@ -244,11 +284,24 @@ async def cmd_nodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def _error_handler(update, ctx):
     logger.error(f"bot error: {ctx.error}", exc_info=ctx.error)
 
+async def _post_init(app):
+    await app.bot.set_my_commands([
+        ("start", "Show help"),
+        ("create", "Create subscription"),
+        ("delete", "Delete subscription"),
+        ("stats", "Subscription stats"),
+        ("list", "List subscriptions (10/page)"),
+        ("edit", "Edit subscription"),
+        ("nodes", "List nodes"),
+        ("addnode", "Add a node"),
+        ("delnode", "Delete a node"),
+    ])
+
 def _build_app():
     token = os.getenv("BOT_TOKEN", "")
     proxy = os.getenv("BOT_PROXY", "")
     builder = ApplicationBuilder().token(token)
-    builder = builder.connect_timeout(30.0).read_timeout(30.0).write_timeout(30.0).pool_timeout(30.0)
+    builder = builder.connect_timeout(30.0).read_timeout(30.0).write_timeout(30.0).pool_timeout(30.0).post_init(_post_init)
     if proxy:
         builder = builder.proxy(proxy).get_updates_proxy(proxy)
     application = builder.build()
@@ -261,6 +314,8 @@ def _build_app():
     application.add_handler(CommandHandler("list", cmd_list))
     application.add_handler(CommandHandler("edit", cmd_edit))
     application.add_handler(CommandHandler("nodes", cmd_nodes))
+    application.add_handler(CommandHandler("addnode", cmd_addnode))
+    application.add_handler(CommandHandler("delnode", cmd_delnode))
     return application
 
 def start():
