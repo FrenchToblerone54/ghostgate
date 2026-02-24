@@ -7,7 +7,7 @@ import threading
 import logging
 import requests
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 GITHUB_REPO = "frenchtoblerone54/ghostgate"
 _logger = logging.getLogger("updater")
 
@@ -57,7 +57,7 @@ def apply_update():
         os.replace(tmp, sys.executable)
         _logger.info(f"Updated to v{latest}, restarting...")
         time.sleep(1)
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        os.execv(sys.executable, [sys.executable] + sys.argv[1:])
     except Exception as e:
         _logger.error(f"Update failed: {e}")
         return False
