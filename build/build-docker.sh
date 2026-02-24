@@ -18,7 +18,6 @@ docker build $BUILD_ARGS -t ghostgate-builder -f build/Dockerfile .
 echo "Building binary..."
 docker run --rm -v "$(pwd):/build" ghostgate-builder bash -c "
 cd /build
-rm -rf build/ghostgate build/ghostgate.pkg
 python3.13 -m PyInstaller --onefile --name ghostgate --add-data 'frontend:frontend' --collect-all rich main.py
 cd dist
 sha256sum ghostgate > ghostgate.sha256
