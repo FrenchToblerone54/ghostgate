@@ -7,7 +7,7 @@ import threading
 import logging
 import requests
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 GITHUB_REPO = "frenchtoblerone54/ghostgate"
 _logger = logging.getLogger("updater")
 
@@ -59,11 +59,15 @@ def apply_update():
         return False
 
 def start_auto_update():
-    if os.getenv("AUTO_UPDATE", "false").lower() != "true":
-        return
     def _loop():
-        time.sleep(60)
-        while True:
+        info = check_update()
+        if info.get("update_available"):
+            _logger.info(f"Update available: v{info['latest']} (current: v{info['current']})")
+        if os.getenv("AUTO_UPDATE", "false").lower() != "true":
+            return
+        if info.get("update_available"):
             apply_update()
+        while True:
             time.sleep(int(os.getenv("UPDATE_CHECK_INTERVAL", "3600")))
+            apply_update()
     threading.Thread(target=_loop, daemon=True).start()

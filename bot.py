@@ -4,6 +4,7 @@ import time
 import uuid
 import shlex
 import io
+import html as _html
 from datetime import datetime, timezone
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
@@ -112,15 +113,15 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     nodes_str_out = ", ".join(added_nodes) if added_nodes else "None"
     msg = (
         f"Subscription Created\n\n"
-        f"ID: ||{sub_id}||\n"
-        f"Comment: {comment or '-'}\n"
+        f"ID: <tg-spoiler>{_html.escape(sub_id)}</tg-spoiler>\n"
+        f"Comment: {_html.escape(comment or '-')}\n"
         f"Data: {data_str}\n"
         f"Expires: {expire_str}\n"
         f"IP Limit: {ip_limit or 'Unlimited'}\n"
-        f"Nodes: {nodes_str_out}\n\n"
-        f"Link: ||{sub_link}||"
+        f"Nodes: {_html.escape(nodes_str_out)}\n\n"
+        f"Link: <tg-spoiler>{_html.escape(sub_link)}</tg-spoiler>"
     )
-    await update.message.reply_text(msg, parse_mode="MarkdownV2")
+    await update.message.reply_text(msg, parse_mode="HTML")
     qr_buf = _make_qr_bytes(sub_link)
     await update.message.reply_photo(photo=qr_buf, caption=f"QR: {comment or sub_id}")
 

@@ -11,16 +11,16 @@ load_dotenv(os.getenv("ENV_PATH", ".env"))
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(os.getenv("LOG_FILE", "/var/log/ghostgate.log"), delay=True)
-    ]
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("main")
 
 def _migrate(old_db_path, node_id):
     import sqlite3
     import database as db
+    if not db.get_node(node_id):
+        print(f"Error: node {node_id} not found. Add it via the panel or bot first.")
+        return
     conn = sqlite3.connect(old_db_path)
     conn.row_factory = sqlite3.Row
     configs = conn.execute("SELECT * FROM configs").fetchall()
@@ -33,7 +33,7 @@ def _migrate(old_db_path, node_id):
             db.add_sub_node(cfg["id"], node_id, cfg["client_id"], cfg["id"])
             count += 1
         except Exception as e:
-            logger.warning(f"migrate error {cfg['id']}: {e}")
+            print(f"migrate error {cfg['id']}: {e}", file=sys.stderr)
     conn.close()
     print(f"Migrated {count}/{len(configs)} subscriptions from {old_db_path}")
 
@@ -60,6 +60,10 @@ def main():
     if args.migrate_from:
         _migrate(args.migrate_from, args.migrate_node)
         sys.exit(0)
+
+    logging.getLogger().addHandler(
+        logging.FileHandler(os.getenv("LOG_FILE", "/var/log/ghostgate.log"), delay=True)
+    )
 
     panel_path = os.getenv("PANEL_PATH", "")
     if not panel_path:
