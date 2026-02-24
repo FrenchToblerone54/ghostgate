@@ -71,9 +71,10 @@ The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/subscriptions` | List subscriptions. Query params: `page`, `per_page` (0 = all), `search` |
+| `GET` | `/api/subscriptions/stream` | SSE stream — emits only changed/deleted subscriptions every 5s |
 | `POST` | `/api/subscriptions` | Create subscription and add to nodes |
 | `GET` | `/api/subscriptions/<id>` | Get subscription with node list |
-| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled`, `remove_days`, `remove_expiry` |
+| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled`, `remove_days`, `remove_expiry`, `remove_data_limit` (set `true` to clear data limit) |
 | `DELETE` | `/api/subscriptions/<id>` | Delete subscription and remove clients from all nodes |
 | `GET` | `/api/subscriptions/<id>/stats` | Get traffic stats |
 | `GET` | `/api/subscriptions/<id>/qr` | QR code PNG for the subscription link |
@@ -171,7 +172,7 @@ Returns `{"ok": true}`.
 { "sub_ids": ["abc123", "def456"], "data_gb": 10, "days": 30 }
 ```
 
-Both `data_gb` and `days` are optional and additive — data is added to the current limit, days are extended from the current expiry (or from now if no expiry is set). **Negative values subtract** — e.g. `"data_gb": -5` removes 5 GB (clamped to 0), `"days": -7` removes 7 days from the current expiry (skipped if no expiry set). Pass `"remove_expiry": true` to clear the expiry date (takes priority over `days`). All expiry changes are pushed to 3x-ui nodes immediately. Returns `{"ok": true}`.
+Both `data_gb` and `days` are optional and additive — data is added to the current limit, days are extended from the current expiry (or from now if no expiry is set). **Negative values subtract** — e.g. `"data_gb": -5` removes 5 GB (clamped to 0), `"days": -7` removes 7 days from the current expiry (skipped if no expiry set). Pass `"remove_expiry": true` to clear the expiry date (takes priority over `days`). Pass `"remove_data_limit": true` to set unlimited data (takes priority over `data_gb`). All expiry changes are pushed to 3x-ui nodes immediately. Returns `{"ok": true}`.
 
 ### Other
 

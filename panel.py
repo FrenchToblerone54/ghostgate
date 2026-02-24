@@ -251,6 +251,37 @@ def register_routes(panel_path):
             sub["node_names"] = [sn["name"] for sn in db.get_sub_nodes(sub["id"])]
         return jsonify({"subs": subs, "total": total, "page": page, "per_page": per_page})
 
+    @app.route(f"/{panel_path}/api/subscriptions/stream")
+    def api_subs_stream():
+        def _gen():
+            prev = {}
+            first = True
+            while True:
+                try:
+                    subs, _ = db.get_subs(1, 0)
+                    for sub in subs:
+                        sub["node_names"] = [sn["name"] for sn in db.get_sub_nodes(sub["id"])]
+                    curr = {s["id"]: s for s in subs}
+                    changed = False
+                    if not first:
+                        for sid in set(prev.keys()) - set(curr.keys()):
+                            yield f"data: {json.dumps({'type': 'delete', 'id': sid})}\n\n"
+                            changed = True
+                        for sid, sub in curr.items():
+                            h = json.dumps({k: sub.get(k) for k in ["used_bytes", "expire_at", "enabled", "data_gb", "comment", "node_names", "ip_limit"]}, sort_keys=True)
+                            if prev.get(sid) != h:
+                                yield f"data: {json.dumps({'type': 'update', 'sub': sub})}\n\n"
+                                changed = True
+                        if not changed:
+                            yield ": heartbeat\n\n"
+                    first = False
+                    prev = {sid: json.dumps({k: curr[sid].get(k) for k in ["used_bytes", "expire_at", "enabled", "data_gb", "comment", "node_names", "ip_limit"]}, sort_keys=True) for sid in curr}
+                except Exception:
+                    pass
+                time.sleep(5)
+        return Response(_gen(), content_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
     @app.route(f"/{panel_path}/api/subscriptions", methods=["POST"])
     def api_subs_create():
         data = request.json
@@ -458,12 +489,15 @@ def register_routes(panel_path):
         add_data_gb = float(data.get("data_gb", 0))
         add_days = int(data.get("days", 0))
         remove_expiry = bool(data.get("remove_expiry", False))
+        remove_data_limit = bool(data.get("remove_data_limit", False))
         for sub_id in sub_ids:
             sub = db.get_sub(sub_id)
             if not sub:
                 continue
             updates = {}
-            if add_data_gb != 0:
+            if remove_data_limit:
+                updates["data_gb"] = 0
+            elif add_data_gb != 0:
                 updates["data_gb"] = max(0, (sub.get("data_gb") or 0) + add_data_gb)
             if remove_expiry:
                 updates["expire_at"] = None

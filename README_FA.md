@@ -79,9 +79,10 @@ sudo ./install.sh
 | متد | مسیر | توضیح |
 |---|---|---|
 | `GET` | `/api/subscriptions` | لیست اشتراک‌ها. پارامترها: `page`، `per_page` (0 = همه)، `search` |
+| `GET` | `/api/subscriptions/stream` | SSE stream — فقط اشتراک‌های تغییرکرده/حذف‌شده هر ۵ ثانیه |
 | `POST` | `/api/subscriptions` | ایجاد اشتراک و افزودن به نودها |
 | `GET` | `/api/subscriptions/<id>` | دریافت اشتراک همراه با لیست نودها |
-| `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit`، `enabled`، `remove_days`، `remove_expiry` |
+| `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit`، `enabled`، `remove_days`، `remove_expiry`، `remove_data_limit` (برای حذف محدودیت داده `true` بدهید) |
 | `DELETE` | `/api/subscriptions/<id>` | حذف اشتراک و حذف کلاینت از تمام نودها |
 | `GET` | `/api/subscriptions/<id>/stats` | دریافت آمار ترافیک |
 | `GET` | `/api/subscriptions/<id>/qr` | تصویر PNG کد QR برای لینک اشتراک |
@@ -179,7 +180,7 @@ sudo ./install.sh
 { "sub_ids": ["abc123", "def456"], "data_gb": 10, "days": 30 }
 ```
 
-هر دو فیلد `data_gb` و `days` اختیاری و افزایشی هستند — داده به محدودیت فعلی اضافه می‌شود و روزها از انقضای فعلی (یا از الان در صورت نداشتن انقضا) افزوده می‌شوند. **مقادیر منفی کاهش می‌دهند** — مثلاً `"data_gb": -5` پنج گیگابایت کم می‌کند (کف صفر)، `"days": -7` هفت روز از انقضای فعلی کم می‌کند (در صورت نداشتن انقضا نادیده گرفته می‌شود). پاسخ: `{"ok": true}`.
+هر دو فیلد `data_gb` و `days` اختیاری و افزایشی هستند — داده به محدودیت فعلی اضافه می‌شود و روزها از انقضای فعلی (یا از الان در صورت نداشتن انقضا) افزوده می‌شوند. **مقادیر منفی کاهش می‌دهند** — مثلاً `"data_gb": -5` پنج گیگابایت کم می‌کند (کف صفر)، `"days": -7` هفت روز از انقضای فعلی کم می‌کند (در صورت نداشتن انقضا نادیده گرفته می‌شود). با `"remove_expiry": true` انقضا حذف می‌شود (اولویت بر `days`). با `"remove_data_limit": true` محدودیت داده حذف می‌شود (اولویت بر `data_gb`). پاسخ: `{"ok": true}`.
 
 ### سایر
 
