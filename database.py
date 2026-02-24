@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS nodes (
     password TEXT NOT NULL,
     inbound_id INTEGER NOT NULL,
     proxy_url TEXT,
+    traffic_multiplier REAL DEFAULT 1.0,
     enabled INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS subscription_nodes (
     node_id INTEGER NOT NULL,
     client_uuid TEXT NOT NULL,
     email TEXT NOT NULL,
+    client_disabled INTEGER DEFAULT 0,
     PRIMARY KEY (sub_id, node_id),
     FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
     FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
@@ -79,12 +81,20 @@ CREATE INDEX IF NOT EXISTS idx_al_sub ON access_logs(sub_id);
             c.execute("ALTER TABLE subscriptions ADD COLUMN show_multiplier INTEGER DEFAULT 1")
         except Exception:
             pass
+        try:
+            c.execute("ALTER TABLE nodes ADD COLUMN traffic_multiplier REAL DEFAULT 1.0")
+        except Exception:
+            pass
+        try:
+            c.execute("ALTER TABLE subscription_nodes ADD COLUMN client_disabled INTEGER DEFAULT 0")
+        except Exception:
+            pass
 
-def add_node(name, address, username, password, inbound_id, proxy_url=None):
+def add_node(name, address, username, password, inbound_id, proxy_url=None, traffic_multiplier=1.0):
     with _conn() as c:
         cur = c.execute(
-            "INSERT INTO nodes (name, address, username, password, inbound_id, proxy_url) VALUES (?,?,?,?,?,?)",
-            (name, address, username, password, inbound_id, proxy_url)
+            "INSERT INTO nodes (name, address, username, password, inbound_id, proxy_url, traffic_multiplier) VALUES (?,?,?,?,?,?,?)",
+            (name, address, username, password, inbound_id, proxy_url, max(1.0, float(traffic_multiplier)))
         )
         return cur.lastrowid
 
@@ -98,7 +108,7 @@ def get_node(node_id):
         return dict(r) if r else None
 
 def update_node(node_id, **kwargs):
-    allowed = {"name", "address", "username", "password", "inbound_id", "proxy_url", "enabled"}
+    allowed = {"name", "address", "username", "password", "inbound_id", "proxy_url", "enabled", "traffic_multiplier"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
         return
@@ -183,13 +193,21 @@ def get_sub_nodes(sub_id):
 def get_all_sub_nodes():
     with _conn() as c:
         return [dict(r) for r in c.execute(
-            "SELECT sn.*, n.name, n.address, n.username, n.password, n.inbound_id, n.proxy_url, n.enabled "
+            "SELECT sn.*, n.name, n.address, n.username, n.password, n.inbound_id, n.proxy_url, n.enabled, n.traffic_multiplier "
             "FROM subscription_nodes sn JOIN nodes n ON sn.node_id=n.id WHERE n.enabled=1"
         )]
 
 def remove_sub_node(sub_id, node_id):
     with _conn() as c:
         c.execute("DELETE FROM subscription_nodes WHERE sub_id=? AND node_id=?", (sub_id, node_id))
+
+def set_sub_node_disabled(sub_id, node_id, disabled):
+    with _conn() as c:
+        c.execute("UPDATE subscription_nodes SET client_disabled=? WHERE sub_id=? AND node_id=?", (int(disabled), sub_id, node_id))
+
+def reset_sub_node_disabled(sub_id):
+    with _conn() as c:
+        c.execute("UPDATE subscription_nodes SET client_disabled=0 WHERE sub_id=?", (sub_id,))
 
 def log_access(sub_id, ip_address=None, user_agent=None):
     with _conn() as c:

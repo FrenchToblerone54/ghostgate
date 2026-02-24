@@ -58,19 +58,26 @@ class XUIClient:
         client["enable"] = enabled
         return self.update_client(inbound_id, client_uuid, client)
 
-    def make_client(self, email, client_uuid, expire_ms=0, ip_limit=0, sub_id="", comment=""):
+    def make_client(self, email, client_uuid, expire_ms=0, ip_limit=0, sub_id="", comment="", total_limit_bytes=0):
         return {
             "id": client_uuid,
             "flow": "",
             "email": email,
             "limitIp": ip_limit,
-            "totalGB": 0,
+            "totalGB": total_limit_bytes,
             "expiryTime": expire_ms,
             "enable": True,
             "tgId": "",
             "subId": sub_id,
             "comment": comment or ""
         }
+
+    def update_client_limit(self, inbound_id, client_uuid, email, total_limit_bytes):
+        client = self.get_client_by_email(inbound_id, email)
+        if not client:
+            return False
+        client["totalGB"] = total_limit_bytes
+        return self.update_client(inbound_id, client_uuid, client)
 
     def test_connection(self):
         try:

@@ -276,7 +276,8 @@ def register_routes(panel_path):
                 continue
             try:
                 xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
-                client = xui.make_client(sub_id, client_uuid, expire_ms, ip_limit, sub_id, comment or "")
+                total_limit_bytes = int(max(0, data_gb * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
+                client = xui.make_client(sub_id, client_uuid, expire_ms, ip_limit, sub_id, comment or "", total_limit_bytes)
                 ok = xui.add_client(node["inbound_id"], client)
                 if ok:
                     db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
@@ -302,6 +303,8 @@ def register_routes(panel_path):
         db.update_sub(sub_id, **updates)
         if "enabled" in body:
             enabled_val = bool(body["enabled"])
+            if enabled_val:
+                db.reset_sub_node_disabled(sub_id)
             snodes = db.get_sub_nodes(sub_id)
             for sn in snodes:
                 try:
@@ -346,7 +349,8 @@ def register_routes(panel_path):
             try:
                 client_uuid = str(uuid.uuid4())
                 xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
-                client = xui.make_client(sub_id, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "")
+                total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
+                client = xui.make_client(sub_id, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
                 ok = xui.add_client(node["inbound_id"], client)
                 if ok:
                     db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
@@ -397,7 +401,8 @@ def register_routes(panel_path):
                     try:
                         client_uuid = str(uuid.uuid4())
                         xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
-                        client = xui.make_client(sub_id, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "")
+                        total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
+                        client = xui.make_client(sub_id, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
                         ok = xui.add_client(node["inbound_id"], client)
                         if ok:
                             db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
@@ -503,7 +508,8 @@ def register_routes(panel_path):
         data = request.json
         node_id = db.add_node(
             data["name"], data["address"], data["username"],
-            data["password"], int(data["inbound_id"]), data.get("proxy_url")
+            data["password"], int(data["inbound_id"]), data.get("proxy_url"),
+            max(1.0, float(data.get("traffic_multiplier", 1.0)))
         )
         return jsonify({"id": node_id})
 

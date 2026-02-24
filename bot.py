@@ -65,7 +65,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/edit <id or comment> [--comment X] [--data GB] [--days N] [--ip N]\n"
         "/list [page] — 10 per page\n"
         "/nodes\n"
-        "/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...]\n"
+        "/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...] [--multiplier N]\n"
         "/delnode <id>\n"
     )
 
@@ -109,7 +109,8 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             continue
         try:
             xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
-            client = xui.make_client(sub_id, client_uuid, expire_ms, ip_limit, sub_id, comment or "")
+            total_limit_bytes = int(data_gb * 1073741824 / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
+            client = xui.make_client(sub_id, client_uuid, expire_ms, ip_limit, sub_id, comment or "", total_limit_bytes)
             if xui.add_client(node["inbound_id"], client):
                 db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
                 added_nodes.append(node["name"])
@@ -233,7 +234,13 @@ async def cmd_edit(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         updates["ip_limit"] = int(opts["ip"])
     if "show-multiplier" in opts:
         updates["show_multiplier"] = max(1, int(opts["show-multiplier"]))
+    if "enable" in opts:
+        updates["enabled"] = 1
+    if "disable" in opts:
+        updates["enabled"] = 0
     if updates:
+        if updates.get("enabled") == 1:
+            db.reset_sub_node_disabled(sub["id"])
         db.update_sub(sub["id"], **updates)
     await update.message.reply_text(f"Updated: {sub.get('comment') or sub['id']}")
 
@@ -251,11 +258,13 @@ async def cmd_addnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     pwd = opts.get("pass")
     inbound = int(opts.get("inbound", 1))
     proxy = opts.get("proxy")
+    multiplier = max(1.0, float(opts.get("multiplier", 1.0)))
     if not all([name, addr, user, pwd]):
-        await update.message.reply_text("Usage: /addnode --name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...]")
+        await update.message.reply_text("Usage: /addnode --name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...] [--multiplier N]")
         return
-    node_id = db.add_node(name, addr, user, pwd, inbound, proxy)
-    await update.message.reply_text(f"Node added: [{node_id}] {name}\n{addr} — inbound {inbound}")
+    node_id = db.add_node(name, addr, user, pwd, inbound, proxy, multiplier)
+    mult_str = f" ×{multiplier:g}" if multiplier != 1.0 else ""
+    await update.message.reply_text(f"Node added: [{node_id}] {name}{mult_str}\n{addr} — inbound {inbound}")
 
 async def cmd_delnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update.effective_user.id):
@@ -285,7 +294,9 @@ async def cmd_nodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     lines = ["Nodes:\n"]
     for n in nodes:
         status = "enabled" if n["enabled"] else "disabled"
-        lines.append(f"[{n['id']}] {n['name']} - {n['address']} - inbound:{n['inbound_id']} - {status}")
+        mult = n.get("traffic_multiplier") or 1.0
+        mult_str = f" ×{mult:g}" if mult != 1.0 else ""
+        lines.append(f"[{n['id']}] {n['name']} - {n['address']} - inbound:{n['inbound_id']}{mult_str} - {status}")
     await update.message.reply_text("\n".join(lines))
 
 async def _error_handler(update, ctx):

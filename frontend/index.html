@@ -393,7 +393,7 @@ Refresh
 <div class="card">
 <div class="table-wrap">
 <table class="tbl">
-<thead><tr><th>#</th><th>Name</th><th>Address</th><th>Inbound</th><th>Proxy</th><th>Status</th><th></th></tr></thead>
+<thead><tr><th>#</th><th>Name</th><th>Address</th><th>Inbound</th><th>×Mult</th><th>Proxy</th><th>Status</th><th></th></tr></thead>
 <tbody id="n-tbody"></tbody>
 </table>
 </div>
@@ -522,8 +522,9 @@ Refresh
 </div>
 <div class="fr">
 <div class="fg"><label class="fl">Inbound ID</label><input class="fi" id="mn-inbound" type="number" placeholder="1"></div>
-<div class="fg"><label class="fl">HTTP/HTTPS Proxy</label><input class="fi" id="mn-proxy" placeholder="http://proxy:3128 (optional)"></div>
+<div class="fg" style="max-width:130px"><label class="fl">Traffic Multiplier</label><input class="fi" id="mn-multiplier" type="number" step="0.1" min="1" placeholder="1"></div>
 </div>
+<div class="fg"><label class="fl">HTTP/HTTPS Proxy</label><input class="fi" id="mn-proxy" placeholder="http://proxy:3128 (optional)"></div>
 </div>
 <div class="modal-ft">
 <button class="btn btn-ghost" onclick="closeM('m-node')">Cancel</button>
@@ -891,6 +892,7 @@ async function loadNodes(){
 <td style="font-weight:700">${n.name}</td>
 <td><span style="font-family:'JetBrains Mono',monospace;font-size:0.78em;color:var(--text2)">${n.address}</span></td>
 <td><span class="badge badge-muted">${n.inbound_id}</span></td>
+<td>${(n.traffic_multiplier&&n.traffic_multiplier!=1)?`<span class="badge badge-yellow" style="font-size:0.72em">×${n.traffic_multiplier}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
 <td>${n.proxy_url?`<span class="badge badge-blue" style="font-size:0.72em">Proxy</span>`:'<span style="color:var(--text3)">—</span>'}</td>
 <td><span class="badge ${n.enabled?"badge-green":"badge-red"}">${n.enabled?"Enabled":"Disabled"}</span></td>
 <td><div class="tbl-actions">
@@ -900,15 +902,17 @@ async function loadNodes(){
 </div></td></tr>`).join("");
 }
 
-function openNodeModal(id){
+async function openNodeModal(id){
   editingNodeId=id;
   document.getElementById("mn-title").textContent=id?"Edit Node":"Add Node";
-  if(!id){ ["mn-name","mn-addr","mn-user","mn-pass","mn-proxy"].forEach(x=>document.getElementById(x).value=""); document.getElementById("mn-inbound").value="1"; }
+  if(!id){ ["mn-name","mn-addr","mn-user","mn-pass","mn-proxy"].forEach(x=>document.getElementById(x).value=""); document.getElementById("mn-inbound").value="1"; document.getElementById("mn-multiplier").value="1"; }
+  else{ const nodes=await fetch(API+"/api/nodes").then(r=>r.json()); const n=nodes.find(x=>x.id===id); if(n){ document.getElementById("mn-name").value=n.name||""; document.getElementById("mn-addr").value=n.address||""; document.getElementById("mn-user").value=n.username||""; document.getElementById("mn-pass").value=""; document.getElementById("mn-inbound").value=n.inbound_id||1; document.getElementById("mn-multiplier").value=n.traffic_multiplier||1; document.getElementById("mn-proxy").value=n.proxy_url||""; } }
   document.getElementById("m-node").classList.add("open");
 }
 
 async function submitNode(){
-  const body={name:document.getElementById("mn-name").value.trim(),address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,inbound_id:parseInt(document.getElementById("mn-inbound").value)||1,proxy_url:document.getElementById("mn-proxy").value.trim()||null};
+  const mult=parseFloat(document.getElementById("mn-multiplier").value)||1;
+  const body={name:document.getElementById("mn-name").value.trim(),address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,inbound_id:parseInt(document.getElementById("mn-inbound").value)||1,traffic_multiplier:Math.max(1,mult),proxy_url:document.getElementById("mn-proxy").value.trim()||null};
   if(!body.name||!body.address||!body.username||!body.password){ showAlert("mn-alert","Name, address, username and password are required","err"); return; }
   if(editingNodeId){ await fetch(API+"/api/nodes/"+editingNodeId,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
   else{ await fetch(API+"/api/nodes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
@@ -916,7 +920,7 @@ async function submitNode(){
 }
 
 async function testNewNode(){
-  const body={name:"_test",address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,inbound_id:parseInt(document.getElementById("mn-inbound").value)||1,proxy_url:document.getElementById("mn-proxy").value.trim()||null};
+  const body={name:"_test",address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,inbound_id:parseInt(document.getElementById("mn-inbound").value)||1,traffic_multiplier:1,proxy_url:document.getElementById("mn-proxy").value.trim()||null};
   const r=await fetch(API+"/api/nodes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(x=>x.json());
   const tr=await fetch(API+"/api/nodes/"+r.id+"/test").then(x=>x.json());
   await fetch(API+"/api/nodes/"+r.id,{method:"DELETE"});

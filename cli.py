@@ -174,11 +174,13 @@ def cmd_nodes(args):
     tbl.add_column("Address", style=f"{BLUE}")
     tbl.add_column("Inbound", style=MUTED)
     tbl.add_column("Proxy", style=MUTED)
+    tbl.add_column("×Mult", style=WARN)
     tbl.add_column("Status")
     for n in nodes:
         status = Text("● Enabled", style=ACC) if n.get("enabled") else Text("● Disabled", style=DANGER)
+        mult = n.get("traffic_multiplier") or 1.0
         tbl.add_row(str(n["id"]), n["name"], n["address"], str(n["inbound_id"]),
-            "Proxy" if n.get("proxy_url") else "—", status)
+            "Proxy" if n.get("proxy_url") else "—", f"×{mult:g}" if mult != 1.0 else "—", status)
     console.print(Panel(tbl, title=f"[bold white]Nodes[/]", border_style=DIM, padding=(0, 1)))
 
 def cmd_status(args):
@@ -236,7 +238,8 @@ def cmd_create(args):
         if not node: continue
         try:
             xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
-            client = xui.make_client(sub_id, client_uuid, expire_ms, ip_limit, sub_id, comment)
+            total_limit_bytes = int(data_gb * 1073741824 / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
+            client = xui.make_client(sub_id, client_uuid, expire_ms, ip_limit, sub_id, comment, total_limit_bytes)
             ok = xui.add_client(node["inbound_id"], client)
             if ok: db.add_sub_node(sub_id, node_id, client_uuid, sub_id)
             else: errors.append(f"node {node_id}: failed")
@@ -302,6 +305,8 @@ def cmd_edit(args):
         return
     db.update_sub(sub["id"], **updates)
     if "enabled" in updates:
+        if updates["enabled"]:
+            db.reset_sub_node_disabled(sub["id"])
         snodes = db.get_sub_nodes(sub["id"])
         for sn in snodes:
             try:
