@@ -2,6 +2,7 @@ import os
 import sys
 import uuid
 import shlex
+import subprocess
 from dotenv import load_dotenv
 import psutil
 from datetime import datetime, timezone, timedelta
@@ -325,7 +326,17 @@ def cmd_update(args):
         return
     console.print(f"[{WARN}]Update found:[/] [{ACC}]v{info['latest']}[/]")
     console.print(f"[{MUTED}]Downloading and applying update...[/]")
-    updater.apply_update()
+    if updater.apply_update():
+        try:
+            active = subprocess.run(["systemctl", "is-active", "ghostgate"], capture_output=True, text=True).stdout.strip() == "active"
+        except Exception:
+            active = False
+        if active:
+            console.print(f"[{ACC}]Updated. Restarting service...[/]")
+            subprocess.run(["systemctl", "restart", "ghostgate"], check=False)
+        else:
+            updater.restart_self()
+        return
     console.print(f"[{DANGER}]Update failed — check logs.[/]")
 
 def cmd_help(args):
