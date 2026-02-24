@@ -368,9 +368,11 @@ Refresh
 <button class="btn btn-ghost btn-sm" onclick="bulkToggle(true)">Enable</button>
 <button class="btn btn-ghost btn-sm" onclick="bulkToggle(false)">Disable</button>
 <input class="fi" id="bulk-add-gb" type="number" min="0" step="0.1" placeholder="GB" style="width:72px;padding:5px 8px;font-size:0.82em">
-<button class="btn btn-ghost btn-sm" onclick="bulkExtend('data')">+Data</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkExtend('data',1)">+Data</button>
+<button class="btn btn-danger btn-sm" onclick="bulkExtend('data',-1)">-Data</button>
 <input class="fi" id="bulk-add-days" type="number" min="1" placeholder="days" style="width:66px;padding:5px 8px;font-size:0.82em">
-<button class="btn btn-ghost btn-sm" onclick="bulkExtend('days')">+Days</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkExtend('days',1)">+Days</button>
+<button class="btn btn-danger btn-sm" onclick="bulkExtend('days',-1)">-Days</button>
 <button class="btn btn-danger btn-sm" onclick="bulkDelete()">Delete</button>
 <button class="btn btn-ghost btn-sm" onclick="clearBulk()">Clear</button>
 </div>
@@ -484,7 +486,7 @@ Refresh
 <div class="fg"><label class="fl">Comment</label><input class="fi" id="me-comment"></div>
 <div class="fr">
 <div class="fg"><label class="fl">Data Limit (GB)</label><input class="fi" id="me-data" type="number" min="0" step="0.1"></div>
-<div class="fg"><label class="fl">Add Days</label><input class="fi" id="me-days" type="number" value="0" min="0"></div>
+<div class="fg"><label class="fl">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0"></div>
 </div>
 <div class="fg"><label class="fl">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="me-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
@@ -776,7 +778,7 @@ async function submitEdit(){
   if(!editingSubId) return;
   const body={comment:document.getElementById("me-comment").value.trim(),data_gb:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
   const days=parseInt(document.getElementById("me-days").value)||0;
-  if(days>0) body.days=days;
+  if(days>0) body.days=days; else if(days<0) body.remove_days=-days;
   const checked=new Set([...document.querySelectorAll("#me-nodes input:checked")].map(i=>parseInt(i.value)));
   const toAdd=[...checked].filter(id=>!editingOrigNodes.has(id));
   const toRemove=[...editingOrigNodes].filter(id=>!checked.has(id));
@@ -829,18 +831,18 @@ async function bulkToggle(enable){
   clearBulk(); loadSubs(); showAlert("s-alert",(enable?"Enabled":"Disabled")+" "+n+" subscriptions","ok");
 }
 
-async function bulkExtend(type){
+async function bulkExtend(type,sign=1){
   const n=selectedSubs.size;
   if(type==="data"){
     const gb=parseFloat(document.getElementById("bulk-add-gb").value)||0;
     if(!gb) return;
-    await fetch(API+"/api/bulk/extend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],data_gb:gb})});
-    showAlert("s-alert","Added "+gb+" GB to "+n+" subscriptions","ok");
+    await fetch(API+"/api/bulk/extend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],data_gb:gb*sign})});
+    showAlert("s-alert",(sign>0?"Added ":"Removed ")+gb+" GB "+(sign>0?"to":"from")+" "+n+" subscriptions","ok");
   } else {
     const days=parseInt(document.getElementById("bulk-add-days").value)||0;
     if(!days) return;
-    await fetch(API+"/api/bulk/extend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],days})});
-    showAlert("s-alert","Added "+days+" days to "+n+" subscriptions","ok");
+    await fetch(API+"/api/bulk/extend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],days:days*sign})});
+    showAlert("s-alert",(sign>0?"Added ":"Removed ")+days+" days "+(sign>0?"to":"from")+" "+n+" subscriptions","ok");
   }
   loadSubs();
 }

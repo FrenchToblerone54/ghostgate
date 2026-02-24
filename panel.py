@@ -300,6 +300,16 @@ def register_routes(panel_path):
     def api_sub_update(sub_id):
         body = request.json
         updates = {k: body[k] for k in ["comment", "data_gb", "days", "ip_limit", "enabled", "show_multiplier"] if k in body}
+        if "remove_days" in body and int(body["remove_days"]) > 0:
+            sub = db.get_sub(sub_id)
+            if sub and sub.get("expire_at"):
+                try:
+                    base = datetime.fromisoformat(sub["expire_at"])
+                    if base.tzinfo is None:
+                        base = base.replace(tzinfo=timezone.utc)
+                    updates["expire_at"] = (base - timedelta(days=int(body["remove_days"]))).isoformat()
+                except Exception:
+                    pass
         db.update_sub(sub_id, **updates)
         if "enabled" in body:
             enabled_val = bool(body["enabled"])
@@ -435,16 +445,18 @@ def register_routes(panel_path):
             if not sub:
                 continue
             updates = {}
-            if add_data_gb > 0:
-                updates["data_gb"] = (sub.get("data_gb") or 0) + add_data_gb
-            if add_days > 0:
+            if add_data_gb != 0:
+                updates["data_gb"] = max(0, (sub.get("data_gb") or 0) + add_data_gb)
+            if add_days != 0:
                 try:
-                    base = datetime.fromisoformat(sub["expire_at"]) if sub.get("expire_at") else datetime.now(timezone.utc)
-                    if base.tzinfo is None:
-                        base = base.replace(tzinfo=timezone.utc)
-                    updates["expire_at"] = (base + timedelta(days=add_days)).isoformat()
+                    base = datetime.fromisoformat(sub["expire_at"]) if sub.get("expire_at") else (datetime.now(timezone.utc) if add_days > 0 else None)
+                    if base is not None:
+                        if base.tzinfo is None:
+                            base = base.replace(tzinfo=timezone.utc)
+                        updates["expire_at"] = (base + timedelta(days=add_days)).isoformat()
                 except Exception:
-                    updates["expire_at"] = (datetime.now(timezone.utc) + timedelta(days=add_days)).isoformat()
+                    if add_days > 0:
+                        updates["expire_at"] = (datetime.now(timezone.utc) + timedelta(days=add_days)).isoformat()
             if updates:
                 db.update_sub(sub_id, **updates)
         return jsonify({"ok": True})

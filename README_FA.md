@@ -45,7 +45,7 @@ sudo ./install.sh
 /delete <آیدی یا کامنت>
 /stats <آیدی یا کامنت>
 /list [صفحه]
-/edit <آیدی یا کامنت> [--comment X] [--data GB] [--days N] [--ip N]
+/edit <آیدی یا کامنت> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--ip N] [--enable] [--disable]
 /nodes
 ```
 
@@ -81,7 +81,7 @@ sudo ./install.sh
 | `GET` | `/api/subscriptions` | لیست اشتراک‌ها. پارامترها: `page`، `per_page` (0 = همه)، `search` |
 | `POST` | `/api/subscriptions` | ایجاد اشتراک و افزودن به نودها |
 | `GET` | `/api/subscriptions/<id>` | دریافت اشتراک همراه با لیست نودها |
-| `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit`، `enabled` |
+| `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit`، `enabled`، `remove_days` |
 | `DELETE` | `/api/subscriptions/<id>` | حذف اشتراک و حذف کلاینت از تمام نودها |
 | `GET` | `/api/subscriptions/<id>/stats` | دریافت آمار ترافیک |
 | `GET` | `/api/subscriptions/<id>/qr` | تصویر PNG کد QR برای لینک اشتراک |
@@ -179,7 +179,7 @@ sudo ./install.sh
 { "sub_ids": ["abc123", "def456"], "data_gb": 10, "days": 30 }
 ```
 
-هر دو فیلد `data_gb` و `days` اختیاری و افزایشی هستند — داده به محدودیت فعلی اضافه می‌شود و روزها از انقضای فعلی (یا از الان در صورت نداشتن انقضا) افزوده می‌شوند. پاسخ: `{"ok": true}`.
+هر دو فیلد `data_gb` و `days` اختیاری و افزایشی هستند — داده به محدودیت فعلی اضافه می‌شود و روزها از انقضای فعلی (یا از الان در صورت نداشتن انقضا) افزوده می‌شوند. **مقادیر منفی کاهش می‌دهند** — مثلاً `"data_gb": -5` پنج گیگابایت کم می‌کند (کف صفر)، `"days": -7` هفت روز از انقضای فعلی کم می‌کند (در صورت نداشتن انقضا نادیده گرفته می‌شود). پاسخ: `{"ok": true}`.
 
 ### سایر
 
@@ -253,7 +253,7 @@ sudo journalctl -u ghostgate -f
 | `ghostgate list [--search X]` | لیست تمام اشتراک‌ها، با فیلتر جستجوی اختیاری |
 | `ghostgate stats <آیدی\|کامنت>` | نمایش آمار ترافیک یک اشتراک |
 | `ghostgate create --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | ایجاد اشتراک جدید |
-| `ghostgate edit <آیدی\|کامنت> [--data GB] [--days N] [--comment X] [--ip N] [--enable] [--disable]` | ویرایش اشتراک موجود |
+| `ghostgate edit <آیدی\|کامنت> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--comment X] [--ip N] [--enable] [--disable]` | ویرایش اشتراک موجود |
 | `ghostgate delete <آیدی\|کامنت>` | حذف اشتراک و حذف کلاینت‌های آن از تمام نودها |
 | `ghostgate nodes` | لیست تمام نودهای تنظیم‌شده |
 | `ghostgate update` | بررسی به‌روزرسانی و اعمال آن در صورت وجود |
@@ -266,6 +266,7 @@ ghostgate list --search علی
 ghostgate stats abc123
 ghostgate create --comment "علی رضایی" --data 50 --days 30 --ip 2 --nodes 1,2
 ghostgate edit abc123 --data 100 --days 60
+ghostgate edit abc123 --remove-data 5 --remove-days 7
 ghostgate edit abc123 --disable
 ghostgate delete abc123
 ghostgate nodes

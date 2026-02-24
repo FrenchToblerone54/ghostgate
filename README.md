@@ -35,7 +35,7 @@ Save the panel URL shown at the end — it is your admin panel access path.
 /delete <id or comment>
 /stats <id or comment>
 /list [page]
-/edit <id or comment> [--comment X] [--data GB] [--days N] [--ip N]
+/edit <id or comment> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--ip N] [--enable] [--disable]
 /nodes
 ```
 
@@ -73,7 +73,7 @@ The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the
 | `GET` | `/api/subscriptions` | List subscriptions. Query params: `page`, `per_page` (0 = all), `search` |
 | `POST` | `/api/subscriptions` | Create subscription and add to nodes |
 | `GET` | `/api/subscriptions/<id>` | Get subscription with node list |
-| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled` |
+| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled`, `remove_days` |
 | `DELETE` | `/api/subscriptions/<id>` | Delete subscription and remove clients from all nodes |
 | `GET` | `/api/subscriptions/<id>/stats` | Get traffic stats |
 | `GET` | `/api/subscriptions/<id>/qr` | QR code PNG for the subscription link |
@@ -171,7 +171,7 @@ Returns `{"ok": true}`.
 { "sub_ids": ["abc123", "def456"], "data_gb": 10, "days": 30 }
 ```
 
-Both `data_gb` and `days` are optional and additive — data is added to the current limit, days are extended from the current expiry (or from now if no expiry is set). Returns `{"ok": true}`.
+Both `data_gb` and `days` are optional and additive — data is added to the current limit, days are extended from the current expiry (or from now if no expiry is set). **Negative values subtract** — e.g. `"data_gb": -5` removes 5 GB (clamped to 0), `"days": -7` removes 7 days from the current expiry (skipped if no expiry set). Returns `{"ok": true}`.
 
 ### Other
 
@@ -245,7 +245,7 @@ The CLI uses [rich](https://github.com/Textualize/rich) for colored terminal out
 | `ghostgate list [--search X]` | List all subscriptions, with optional search filter |
 | `ghostgate stats <id\|comment>` | Show traffic stats for a subscription |
 | `ghostgate create --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | Create a new subscription |
-| `ghostgate edit <id\|comment> [--data GB] [--days N] [--comment X] [--ip N] [--enable] [--disable]` | Edit an existing subscription |
+| `ghostgate edit <id\|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--comment X] [--ip N] [--enable] [--disable]` | Edit an existing subscription |
 | `ghostgate delete <id\|comment>` | Delete a subscription and remove its clients from all nodes |
 | `ghostgate nodes` | List all configured nodes |
 | `ghostgate update` | Check for an update and apply it if available |
@@ -258,6 +258,7 @@ ghostgate list --search alice
 ghostgate stats abc123
 ghostgate create --comment "Alice" --data 50 --days 30 --ip 2 --nodes 1,2
 ghostgate edit abc123 --data 100 --days 60
+ghostgate edit abc123 --remove-data 5 --remove-days 7
 ghostgate edit abc123 --disable
 ghostgate delete abc123
 ghostgate nodes
