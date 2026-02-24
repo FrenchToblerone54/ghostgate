@@ -406,6 +406,8 @@ Refresh
 <div class="fg"><label class="fl">Port</label><input class="fi" id="cfg-port" type="number" placeholder="5000"></div>
 </div>
 <div class="fg"><label class="fl">Sync Interval (seconds)</label><input class="fi" id="cfg-sync" type="number" placeholder="20"></div>
+<div class="fg"><label class="fl">Data Label (subscription page)</label><input class="fi" id="cfg-data-label" placeholder="⬇️ Data left"></div>
+<div class="fg"><label class="fl">Expire Label (subscription page)</label><input class="fi" id="cfg-expire-label" placeholder="⏰ Expires"></div>
 <div class="fg"><label class="fl">Panel Worker Threads</label><input class="fi" id="cfg-threads" type="number" placeholder="8"></div>
 <div class="fg"><label class="fl">Log File</label><input class="fi" id="cfg-log" placeholder="/var/log/ghostgate.log"></div>
 </div>
@@ -618,7 +620,8 @@ async function loadSubs(){
     const expTs=sub.expire_at?new Date(sub.expire_at).getTime():0;
     const isExp=expTs>0&&expTs<nowMs;
     const isOver=limitB>0&&usedB>=limitB;
-    const statusBadge=isExp||isOver?`<span class="badge badge-red">${isExp?"Expired":"Over Limit"}</span>`:'<span class="badge badge-green">Active</span>';
+    const isDisabled=sub.enabled===0||sub.enabled===false;
+    const statusBadge=isDisabled?'<span class="badge badge-muted">Disabled</span>':isExp||isOver?`<span class="badge badge-red">${isExp?"Expired":"Over Limit"}</span>`:'<span class="badge badge-green">Active</span>';
     const nodes=(sub.node_names||[]).map(n=>`<span class="badge badge-muted" style="font-size:0.72em">${n}</span>`).join(" ")||'<span style="color:var(--text3);font-size:0.8em">—</span>';
     const progCls=pct>85?" d":pct>65?" w":"";
     const exactUsed=usedB.toLocaleString()+" bytes ("+((usedB/1073741824).toFixed(4))+" GB)";
@@ -638,7 +641,7 @@ async function loadSubs(){
 <td><div class="tbl-actions">
 <button class="btn btn-icon btn-sm" onclick="viewSub('${sub.id}')" title="Details"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
 <button class="btn btn-icon btn-sm" onclick="editSub('${sub.id}')" title="Edit"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-<button class="btn btn-danger btn-sm" onclick="deleteSub('${sub.id}')">Del</button>
+<button class="btn btn-icon btn-sm" onclick="toggleSubEnabled('${sub.id}',${sub.enabled!==0?'true':'false'})" title="${sub.enabled!==0?'Disable':'Enable'}">${sub.enabled!==0?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>':'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="9 11 12 14 22 4"/></svg>'}</button><button class="btn btn-danger btn-sm" onclick="deleteSub('${sub.id}')">Del</button>
 </div></td></tr>`;
   }).join("");
 }
@@ -688,7 +691,7 @@ async function submitCreate(){
 }
 
 async function viewSub(id){
-  const sub=await fetch(API+"/api/subscriptions/"+id).then(r=>r.json());
+  const [sub,stats]=await Promise.all([fetch(API+"/api/subscriptions/"+id).then(r=>r.json()),fetch(API+"/api/subscriptions/"+id+"/stats").then(r=>r.json())]);
   document.getElementById("md-title").textContent=sub.comment||id;
   document.getElementById("md-qr").src=API+"/api/subscriptions/"+id+"/qr";
   const baseUrl=window.location.origin;
@@ -698,6 +701,10 @@ async function viewSub(id){
   const totalStr=sub.data_gb>0?sub.data_gb+" GB":"Unlimited";
   const expStr=sub.expire_at?sub.expire_at.substring(0,16):"Never";
   const nodes=(sub.nodes||[]).map(n=>n.name||n).join(", ")||"None";
+  const fmtDate=s=>s?s.substring(0,16).replace("T"," "):"—";
+  const firstStr=stats.first_access?`<span title="${stats.first_access}">${fmtDate(stats.first_access)}</span>`:"—";
+  const lastStr=stats.last_access?`<span title="${stats.last_access}">${fmtDate(stats.last_access)}</span>`:"—";
+  const uaStr=stats.last_ua?`<span style="font-size:0.78em;color:var(--text2);word-break:break-all">${stats.last_ua}</span>`:"—";
   document.getElementById("md-rows").innerHTML=[
     ["ID",`<span class="tbl-id">${id}</span>`],
     ["Comment",sub.comment||"—"],
@@ -705,7 +712,11 @@ async function viewSub(id){
     ["Expires",expStr],
     ["IP Limit",sub.ip_limit||"Unlimited"],
     ["Nodes",nodes],
-    ["Created",sub.created_at?sub.created_at.substring(0,10):"—"]
+    ["Created",sub.created_at?sub.created_at.substring(0,10):"—"],
+    ["Accesses",stats.access_count||0],
+    ["First Access",firstStr],
+    ["Last Access",lastStr],
+    ["Last Client",uaStr]
   ].map(([k,v])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${v}</span></div>`).join("");
   document.getElementById("m-detail").classList.add("open");
 }
@@ -779,6 +790,10 @@ async function bulkNodes(action){
   showAlert("s-alert",r.errors&&r.errors.length?msg+" (with errors): "+r.errors.join("; "):msg,"ok");
 }
 
+async function toggleSubEnabled(id, currently_enabled){
+  await fetch(API+"/api/subscriptions/"+id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:currently_enabled?0:1})});
+  loadSubs(); showAlert("s-alert",currently_enabled?"Subscription disabled":"Subscription enabled","ok");
+}
 async function deleteSub(id){
   if(!confirm("Delete this subscription and remove from all nodes?")) return;
   await fetch(API+"/api/subscriptions/"+id,{method:"DELETE"});
@@ -860,6 +875,8 @@ async function loadSettings(){
   document.getElementById("cfg-host").value=s.HOST||"";
   document.getElementById("cfg-port").value=s.PORT||"";
   document.getElementById("cfg-sync").value=s.SYNC_INTERVAL||"20";
+  document.getElementById("cfg-data-label").value=s.DATA_LABEL||"";
+  document.getElementById("cfg-expire-label").value=s.EXPIRE_LABEL||"";
   document.getElementById("cfg-threads").value=s.PANEL_THREADS||"8";
   document.getElementById("cfg-log").value=s.LOG_FILE||"";
   document.getElementById("cfg-token").value=s.BOT_TOKEN||"";
@@ -874,6 +891,8 @@ async function saveSettings(){
     HOST:document.getElementById("cfg-host").value.trim(),
     PORT:document.getElementById("cfg-port").value.trim(),
     SYNC_INTERVAL:document.getElementById("cfg-sync").value.trim(),
+    DATA_LABEL:document.getElementById("cfg-data-label").value.trim(),
+    EXPIRE_LABEL:document.getElementById("cfg-expire-label").value.trim(),
     PANEL_THREADS:document.getElementById("cfg-threads").value.trim(),
     LOG_FILE:document.getElementById("cfg-log").value.trim(),
     BOT_TOKEN:document.getElementById("cfg-token").value.trim(),

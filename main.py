@@ -17,10 +17,13 @@ logger = logging.getLogger("main")
 
 def _migrate(old_db_path, node_id):
     import sqlite3
+    from datetime import datetime, timezone
     import database as db
+    from xui_client import XUIClient
     if not db.get_node(node_id):
         print(f"Error: node {node_id} not found. Add it via the panel or bot first.")
         return
+    node = db.get_node(node_id)
     conn = sqlite3.connect(old_db_path)
     conn.row_factory = sqlite3.Row
     configs = conn.execute("SELECT * FROM configs").fetchall()
@@ -31,6 +34,18 @@ def _migrate(old_db_path, node_id):
                 continue
             db.create_sub(comment=cfg["comment"], sub_id=cfg["id"])
             db.add_sub_node(cfg["id"], node_id, cfg["client_id"], cfg["id"])
+            try:
+                xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
+                client = xui.get_client_by_email(node["inbound_id"], cfg["id"])
+                if client:
+                    data_gb = (client.get("totalGB") or 0)/1073741824
+                    expire_ms = client.get("expiryTime") or 0
+                    updates = {"data_gb": data_gb}
+                    if expire_ms>0:
+                        updates["expire_at"] = datetime.fromtimestamp(expire_ms/1000, tz=timezone.utc).isoformat()
+                    db.update_sub(cfg["id"], **updates)
+            except Exception as xe:
+                print(f"  warning: could not fetch 3x-ui data for {cfg['id']}: {xe}", file=sys.stderr)
             count += 1
         except Exception as e:
             print(f"migrate error {cfg['id']}: {e}", file=sys.stderr)

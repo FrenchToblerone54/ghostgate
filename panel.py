@@ -121,7 +121,9 @@ def sub_page(sub_id):
     sub = db.get_sub(sub_id)
     if not sub:
         return "Not Found", 404
-    db.log_access(sub_id)
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+    ua = request.headers.get("User-Agent", "")
+    db.log_access(sub_id, ip, ua)
     snodes = db.get_sub_nodes(sub_id)
     base_url = BASE_URL or request.host_url.rstrip("/")
     sub_url = f"{base_url}/sub/{sub_id}"
@@ -133,24 +135,22 @@ def sub_page(sub_id):
             expire_ts = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp())
         except Exception:
             pass
-    ua = request.headers.get("User-Agent", "")
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    is_expired = expire_ts > 0 and expire_ts < now_ts
+    is_over_limit = limit_bytes > 0 and total_bytes >= limit_bytes
+    data_percent = min(100, int(total_bytes * 100 / limit_bytes)) if limit_bytes > 0 else 0
+    data_used_str = f"{total_bytes/1073741824:.2f} GB"
+    data_total_str = f"{sub['data_gb']:.1f} GB" if limit_bytes > 0 else "Unlimited"
+    if expire_ts > 0:
+        diff = expire_ts - now_ts
+        expire_str = f"{diff // 86400}d {(diff % 86400) // 3600}h" if diff > 0 else "Expired"
+    else:
+        expire_str = "No Expiry"
+    data_label = os.getenv("DATA_LABEL", "⬇️ Data left")
+    expire_label = os.getenv("EXPIRE_LABEL", "⏰ Expires")
     is_browser = any(b in ua for b in ["Mozilla", "Chrome", "Safari", "Firefox", "Edge", "Opera"])
     if is_browser:
         qr_b64 = _make_qr_b64(sub_url)
-        data_percent = min(100, int(total_bytes * 100 / limit_bytes)) if limit_bytes > 0 else 0
-        data_used_str = f"{total_bytes/1073741824:.2f} GB"
-        data_total_str = f"{sub['data_gb']:.1f} GB" if limit_bytes > 0 else "Unlimited"
-        now_ts = int(datetime.now(timezone.utc).timestamp())
-        is_expired = expire_ts > 0 and expire_ts < now_ts
-        is_over_limit = limit_bytes > 0 and total_bytes >= limit_bytes
-        if expire_ts > 0:
-            diff = expire_ts - now_ts
-            if diff > 0:
-                expire_str = f"{diff // 86400}d {(diff % 86400) // 3600}h"
-            else:
-                expire_str = "Expired"
-        else:
-            expire_str = "No Expiry"
         base_dir = os.path.dirname(os.path.abspath(__file__))
         with open(os.path.join(base_dir, "frontend", "sub.html")) as f:
             tmpl = f.read()
@@ -158,9 +158,13 @@ def sub_page(sub_id):
             sub_url=sub_url, qr_b64=qr_b64,
             comment=sub.get("comment") or "Subscription",
             data_used_str=data_used_str, data_total_str=data_total_str, data_percent=data_percent,
-            expire_str=expire_str, is_expired=is_expired, is_over_limit=is_over_limit
+            expire_str=expire_str, is_expired=is_expired, is_over_limit=is_over_limit,
+            data_label=data_label, expire_label=expire_label
         )
-    configs = []
+    configs = [
+        f"vless://00000000-0000-0000-0000-000000000001@0.0.0.0:443?type=tcp#{quote(f'{data_label}: {data_used_str} / {data_total_str}')}",
+        f"vless://00000000-0000-0000-0000-000000000002@0.0.0.0:443?type=tcp#{quote(f'{expire_label}: {expire_str}')}",
+    ]
     for sn in snodes:
         try:
             xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
@@ -291,9 +295,18 @@ def register_routes(panel_path):
 
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>", methods=["PUT"])
     def api_sub_update(sub_id):
-        data = request.json
-        updates = {k: data[k] for k in ["comment", "data_gb", "days", "ip_limit"] if k in data}
+        body = request.json
+        updates = {k: body[k] for k in ["comment", "data_gb", "days", "ip_limit", "enabled"] if k in body}
         db.update_sub(sub_id, **updates)
+        if "enabled" in body:
+            enabled_val = bool(body["enabled"])
+            snodes = db.get_sub_nodes(sub_id)
+            for sn in snodes:
+                try:
+                    xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                    xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], enabled_val)
+                except Exception:
+                    pass
         return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>", methods=["DELETE"])
