@@ -8,7 +8,7 @@ import time
 import threading
 import subprocess
 from urllib.parse import quote
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Flask, jsonify, request, Response, render_template_string
 import psutil
 import qrcode
@@ -416,6 +416,31 @@ def register_routes(panel_path):
                         pass
                     db.remove_sub_node(sub_id, node_id)
         return jsonify({"ok": True, "errors": errors})
+
+    @app.route(f"/{panel_path}/api/bulk/extend", methods=["POST"])
+    def api_bulk_extend():
+        data = request.json
+        sub_ids = data.get("sub_ids", [])
+        add_data_gb = float(data.get("data_gb", 0))
+        add_days = int(data.get("days", 0))
+        for sub_id in sub_ids:
+            sub = db.get_sub(sub_id)
+            if not sub:
+                continue
+            updates = {}
+            if add_data_gb > 0:
+                updates["data_gb"] = (sub.get("data_gb") or 0) + add_data_gb
+            if add_days > 0:
+                try:
+                    base = datetime.fromisoformat(sub["expire_at"]) if sub.get("expire_at") else datetime.now(timezone.utc)
+                    if base.tzinfo is None:
+                        base = base.replace(tzinfo=timezone.utc)
+                    updates["expire_at"] = (base + timedelta(days=add_days)).isoformat()
+                except Exception:
+                    updates["expire_at"] = (datetime.now(timezone.utc) + timedelta(days=add_days)).isoformat()
+            if updates:
+                db.update_sub(sub_id, **updates)
+        return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/bulk/delete", methods=["POST"])
     def api_bulk_delete():

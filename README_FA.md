@@ -78,7 +78,7 @@ sudo ./install.sh
 
 | متد | مسیر | توضیح |
 |---|---|---|
-| `GET` | `/api/subscriptions` | لیست اشتراک‌ها. پارامترها: `page`، `per_page`، `search` |
+| `GET` | `/api/subscriptions` | لیست اشتراک‌ها. پارامترها: `page`، `per_page` (0 = همه)، `search` |
 | `POST` | `/api/subscriptions` | ایجاد اشتراک و افزودن به نودها |
 | `GET` | `/api/subscriptions/<id>` | دریافت اشتراک همراه با لیست نودها |
 | `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit`، `enabled` |
@@ -147,6 +147,7 @@ sudo ./install.sh
 | `POST` | `/api/bulk/nodes` | افزودن یا حذف یک نود از چندین اشتراک به‌صورت همزمان |
 | `POST` | `/api/bulk/delete` | حذف چندین اشتراک و حذف کلاینت‌های آن‌ها از تمام نودها |
 | `POST` | `/api/bulk/toggle` | فعال یا غیرفعال کردن چندین اشتراک |
+| `POST` | `/api/bulk/extend` | افزودن داده (GB) و/یا روز به چندین اشتراک |
 
 **بدنه درخواست `/api/bulk/nodes`:**
 ```json
@@ -172,6 +173,13 @@ sudo ./install.sh
 ```
 
 پاسخ: `{"ok": true}`.
+
+**بدنه درخواست `/api/bulk/extend`:**
+```json
+{ "sub_ids": ["abc123", "def456"], "data_gb": 10, "days": 30 }
+```
+
+هر دو فیلد `data_gb` و `days` اختیاری و افزایشی هستند — داده به محدودیت فعلی اضافه می‌شود و روزها از انقضای فعلی (یا از الان در صورت نداشتن انقضا) افزوده می‌شوند. پاسخ: `{"ok": true}`.
 
 ### سایر
 

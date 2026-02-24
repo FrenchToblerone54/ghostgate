@@ -70,7 +70,7 @@ The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/subscriptions` | List subscriptions. Query params: `page`, `per_page`, `search` |
+| `GET` | `/api/subscriptions` | List subscriptions. Query params: `page`, `per_page` (0 = all), `search` |
 | `POST` | `/api/subscriptions` | Create subscription and add to nodes |
 | `GET` | `/api/subscriptions/<id>` | Get subscription with node list |
 | `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled` |
@@ -139,6 +139,7 @@ Nodes already assigned to the subscription are silently skipped.
 | `POST` | `/api/bulk/nodes` | Add or remove a node across multiple subscriptions |
 | `POST` | `/api/bulk/delete` | Delete multiple subscriptions and remove their clients from all nodes |
 | `POST` | `/api/bulk/toggle` | Enable or disable multiple subscriptions |
+| `POST` | `/api/bulk/extend` | Add data (GB) and/or days to multiple subscriptions |
 
 **`/api/bulk/nodes` request body:**
 ```json
@@ -164,6 +165,13 @@ Returns `{"ok": true, "deleted": 2}`.
 ```
 
 Returns `{"ok": true}`.
+
+**`/api/bulk/extend` request body:**
+```json
+{ "sub_ids": ["abc123", "def456"], "data_gb": 10, "days": 30 }
+```
+
+Both `data_gb` and `days` are optional and additive — data is added to the current limit, days are extended from the current expiry (or from now if no expiry is set). Returns `{"ok": true}`.
 
 ### Other
 

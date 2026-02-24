@@ -116,12 +116,13 @@ def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled
     return sub_id
 
 def get_subs(page=1, per_page=20, search=None):
-    offset = (page - 1) * per_page
+    limit = per_page if per_page > 0 else -1
+    offset = (page - 1) * per_page if per_page > 0 else 0
     with _conn() as c:
         if search:
             rows = c.execute(
                 "SELECT * FROM subscriptions WHERE id LIKE ? OR comment LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                (f"%{search}%", f"%{search}%", per_page, offset)
+                (f"%{search}%", f"%{search}%", limit, offset)
             ).fetchall()
             total = c.execute(
                 "SELECT COUNT(*) FROM subscriptions WHERE id LIKE ? OR comment LIKE ?",
@@ -130,7 +131,7 @@ def get_subs(page=1, per_page=20, search=None):
         else:
             rows = c.execute(
                 "SELECT * FROM subscriptions ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                (per_page, offset)
+                (limit, offset)
             ).fetchall()
             total = c.execute("SELECT COUNT(*) FROM subscriptions").fetchone()[0]
         return [dict(r) for r in rows], total
