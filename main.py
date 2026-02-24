@@ -53,6 +53,17 @@ def _migrate(old_db_path, node_id):
     print(f"Migrated {count}/{len(configs)} subscriptions from {old_db_path}")
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "update":
+        info = updater.check_update()
+        if not info.get("update_available"):
+            print(f"ghostgate v{info['current']} is up to date")
+        else:
+            print(f"Update available: v{info['current']} → v{info['latest']}")
+            print("Applying update...")
+            updater.apply_update()
+            print("Update failed — check logs")
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(description="GhostGate - VPN Subscription Manager")
     parser.add_argument("--generate-path", action="store_true", help="Generate a new random panel path")
     parser.add_argument("--version", action="store_true", help="Show version and exit")

@@ -348,7 +348,15 @@ Refresh
 </div>
 <button class="btn btn-accent" onclick="openCreate()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New</button>
 </div>
+<div style="display:flex;align-items:center;gap:8px">
+<select class="fi" id="per-page-sel" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="changePerPage(this.value)">
+<option value="10">10/page</option>
+<option value="20" selected>20/page</option>
+<option value="50">50/page</option>
+<option value="100">100/page</option>
+</select>
 <div class="pag" id="pag-top"></div>
+</div>
 </div>
 <div id="s-alert" class="alert"></div>
 <div id="bulk-bar" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:var(--card2);border:1px solid var(--accent-border);border-radius:var(--radius-sm);margin-bottom:10px;flex-wrap:wrap">
@@ -356,6 +364,9 @@ Refresh
 <select class="fi" id="bulk-node" style="width:auto;flex:1;min-width:140px;max-width:220px"></select>
 <button class="btn btn-accent btn-sm" onclick="bulkNodes('add')">Add to Node</button>
 <button class="btn btn-danger btn-sm" onclick="bulkNodes('remove')">Remove from Node</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkToggle(true)">Enable</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkToggle(false)">Disable</button>
+<button class="btn btn-danger btn-sm" onclick="bulkDelete()">Delete</button>
 <button class="btn btn-ghost btn-sm" onclick="clearBulk()">Clear</button>
 </div>
 <div class="card">
@@ -420,6 +431,14 @@ Refresh
 <div class="fg"><label class="fl">Bot Proxy (optional)</label><input class="fi" id="cfg-proxy" placeholder="http://proxy:3128"></div>
 <div class="fg"><label class="fl">Update Proxy (optional)</label><input class="fi" id="cfg-update-proxy" placeholder="http://proxy:3128"></div>
 </div>
+</div>
+</div>
+<div class="card" style="margin-top:16px;max-width:900px">
+<div class="card-header"><span class="card-title">Updates</span><span id="upd-info" style="font-size:0.82em;color:var(--text2)"></span></div>
+<div class="card-body" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+<button class="btn btn-ghost" onclick="checkUpdate()">Check for Update</button>
+<button class="btn btn-accent" id="upd-apply-btn" style="display:none" onclick="applyUpdate()">Apply Update</button>
+<span id="upd-status" style="font-size:0.84em;color:var(--text2)"></span>
 </div>
 </div>
 <div style="display:flex;gap:10px;margin-top:16px;max-width:900px">
@@ -509,7 +528,7 @@ Refresh
 
 <script>
 const API="{{prefix}}";
-let sPage=1,sTotalPages=1,sSearch="",sTimer=null;
+let sPage=1,sTotalPages=1,sSearch="",sTimer=null,sPerPage=20;
 let editingSubId=null,editingNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set();
 let logStream=null,liveLog=false;
 let prevNet={sent:0,recv:0,t:0};
@@ -606,7 +625,7 @@ evt.onerror=function(){
 function onSearch(v){ clearTimeout(sTimer); sTimer=setTimeout(()=>{ sSearch=v; sPage=1; loadSubs(); },350); }
 
 async function loadSubs(){
-  const qs=new URLSearchParams({page:sPage,per_page:20,search:sSearch||""});
+  const qs=new URLSearchParams({page:sPage,per_page:sPerPage,search:sSearch||""});
   const r=await fetch(API+"/api/subscriptions?"+qs).then(x=>x.json());
   const subs=r.subs||[];
   sTotalPages=Math.max(1,Math.ceil(r.total/r.per_page));
@@ -779,6 +798,41 @@ async function updateBulkBar(){
     const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
     document.getElementById("bulk-node").innerHTML=nodes.map(nd=>`<option value="${nd.id}">${nd.name}</option>`).join("");
   }
+}
+
+function changePerPage(v){ sPerPage=parseInt(v); sPage=1; loadSubs(); }
+
+async function bulkDelete(){
+  const n=selectedSubs.size;
+  if(!confirm("Delete "+n+" subscriptions? This cannot be undone."))return;
+  await fetch(API+"/api/bulk/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs]})});
+  clearBulk(); loadSubs(); showAlert("s-alert","Deleted "+n+" subscriptions","ok");
+}
+
+async function bulkToggle(enable){
+  const n=selectedSubs.size;
+  await fetch(API+"/api/bulk/toggle",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],enabled:enable})});
+  clearBulk(); loadSubs(); showAlert("s-alert",(enable?"Enabled":"Disabled")+" "+n+" subscriptions","ok");
+}
+
+async function checkUpdate(){
+  document.getElementById("upd-status").textContent="Checking...";
+  const r=await fetch(API+"/api/update").then(x=>x.json());
+  document.getElementById("upd-info").textContent="v"+r.current;
+  if(r.update_available){
+    document.getElementById("upd-status").textContent="Update available: v"+r.latest;
+    document.getElementById("upd-apply-btn").style.display="";
+  } else {
+    document.getElementById("upd-status").textContent="Up to date";
+    document.getElementById("upd-apply-btn").style.display="none";
+  }
+}
+
+async function applyUpdate(){
+  if(!confirm("Apply update? GhostGate will restart."))return;
+  await fetch(API+"/api/update",{method:"POST"});
+  showAlert("cfg-alert","Update triggered — restarting…","ok");
+  setTimeout(()=>location.reload(),8000);
 }
 
 async function bulkNodes(action){

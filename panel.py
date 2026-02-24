@@ -417,6 +417,36 @@ def register_routes(panel_path):
                     db.remove_sub_node(sub_id, node_id)
         return jsonify({"ok": True, "errors": errors})
 
+    @app.route(f"/{panel_path}/api/bulk/delete", methods=["POST"])
+    def api_bulk_delete():
+        sub_ids = request.json.get("sub_ids", [])
+        for sub_id in sub_ids:
+            snodes = db.get_sub_nodes(sub_id)
+            for sn in snodes:
+                try:
+                    xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                    xui.delete_client(sn["inbound_id"], sn["client_uuid"])
+                except Exception:
+                    pass
+            db.delete_sub(sub_id)
+        return jsonify({"ok": True, "deleted": len(sub_ids)})
+
+    @app.route(f"/{panel_path}/api/bulk/toggle", methods=["POST"])
+    def api_bulk_toggle():
+        data = request.json
+        sub_ids = data.get("sub_ids", [])
+        enabled_val = bool(data.get("enabled", True))
+        for sub_id in sub_ids:
+            db.update_sub(sub_id, enabled=1 if enabled_val else 0)
+            snodes = db.get_sub_nodes(sub_id)
+            for sn in snodes:
+                try:
+                    xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                    xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], enabled_val)
+                except Exception:
+                    pass
+        return jsonify({"ok": True})
+
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/stats")
     def api_sub_stats(sub_id):
         return jsonify(db.get_stats(sub_id))
