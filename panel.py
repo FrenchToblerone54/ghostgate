@@ -157,7 +157,6 @@ def sub_page(sub_id):
             tmpl = f.read()
         return render_template_string(tmpl,
             sub_url=sub_url, qr_b64=qr_b64,
-            comment=sub.get("comment") or "Subscription",
             data_used_str=data_used_str, data_total_str=data_total_str, data_percent=data_percent,
             expire_str=expire_str, is_expired=is_expired, is_over_limit=is_over_limit,
             data_label=data_label, expire_label=expire_label
