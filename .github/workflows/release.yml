@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g. 0.4.4)"
+        description: "Version to release (e.g. 0.4.4 or v0.4.4)"
         required: true
         type: string
 permissions:
@@ -21,10 +21,16 @@ jobs:
           if ! command -v python3.13 >/dev/null 2>&1; then
             sudo ln -sf "$(which python)" /usr/local/bin/python3.13
           fi
+      - name: Normalize version input
+        id: ver
+        run: |
+          ver="${{ inputs.version }}"
+          ver="${ver#v}"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
       - name: Verify version matches updater.py
         run: |
-          v="$(python -c 'import re, pathlib; txt=pathlib.Path("updater.py").read_text(); m=re.search(r"^VERSION\\s*=\\s*\\\"([^\\\"]+)\\\"", txt, re.M); print(m.group(1) if m else "")')"
-          if [ "$v" != "${{ inputs.version }}" ]; then
+          v="$(python -c 'import re, pathlib; txt=pathlib.Path("updater.py").read_text(); m=re.search(r"^VERSION\s*=\s*\"([^\"]+)\"", txt, re.M); print(m.group(1) if m else "")')"
+          if [ "$v" != "${{ steps.ver.outputs.version }}" ]; then
             echo "updater.py VERSION=$v does not match input version=${{ inputs.version }}"
             exit 1
           fi
@@ -38,8 +44,8 @@ jobs:
       - name: Create release
         uses: ncipollo/release-action@v1
         with:
-          tag: v${{ inputs.version }}
-          name: v${{ inputs.version }}
+          tag: v${{ steps.ver.outputs.version }}
+          name: v${{ steps.ver.outputs.version }}
           artifacts: dist/ghostgate,dist/ghostgate.sha256
           allowUpdates: true
           generateReleaseNotes: true
