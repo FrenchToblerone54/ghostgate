@@ -7,7 +7,7 @@ import threading
 import logging
 import requests
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 GITHUB_REPO = "frenchtoblerone54/ghostgate"
 _logger = logging.getLogger("updater")
 

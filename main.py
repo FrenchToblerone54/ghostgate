@@ -27,6 +27,8 @@ def _migrate(old_db_path, node_id):
     count = 0
     for cfg in configs:
         try:
+            if db.get_sub(cfg["id"]):
+                continue
             db.create_sub(comment=cfg["comment"], sub_id=cfg["id"])
             db.add_sub_node(cfg["id"], node_id, cfg["client_id"], cfg["id"])
             count += 1
@@ -37,8 +39,8 @@ def _migrate(old_db_path, node_id):
 
 def main():
     parser = argparse.ArgumentParser(description="GhostGate - VPN Subscription Manager")
-    parser.add_argument("--generate-path", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--version", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--generate-path", action="store_true", help="Generate a new random panel path")
+    parser.add_argument("--version", action="store_true", help="Show version and exit")
     parser.add_argument("--migrate-from", help=argparse.SUPPRESS)
     parser.add_argument("--migrate-node", type=int, default=1, help=argparse.SUPPRESS)
     args = parser.parse_args()
