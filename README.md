@@ -35,7 +35,7 @@ Save the panel URL shown at the end — it is your admin panel access path.
 /delete <id or comment>
 /stats <id or comment>
 /list [page]
-/edit <id or comment> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--ip N] [--enable] [--disable]
+/edit <id or comment> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
 /nodes
 ```
 
@@ -73,7 +73,7 @@ The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the
 | `GET` | `/api/subscriptions` | List subscriptions. Query params: `page`, `per_page` (0 = all), `search` |
 | `POST` | `/api/subscriptions` | Create subscription and add to nodes |
 | `GET` | `/api/subscriptions/<id>` | Get subscription with node list |
-| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled`, `remove_days` |
+| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled`, `remove_days`, `remove_expiry` |
 | `DELETE` | `/api/subscriptions/<id>` | Delete subscription and remove clients from all nodes |
 | `GET` | `/api/subscriptions/<id>/stats` | Get traffic stats |
 | `GET` | `/api/subscriptions/<id>/qr` | QR code PNG for the subscription link |
@@ -245,7 +245,7 @@ The CLI uses [rich](https://github.com/Textualize/rich) for colored terminal out
 | `ghostgate list [--search X]` | List all subscriptions, with optional search filter |
 | `ghostgate stats <id\|comment>` | Show traffic stats for a subscription |
 | `ghostgate create --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | Create a new subscription |
-| `ghostgate edit <id\|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--comment X] [--ip N] [--enable] [--disable]` | Edit an existing subscription |
+| `ghostgate edit <id\|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable]` | Edit an existing subscription |
 | `ghostgate delete <id\|comment>` | Delete a subscription and remove its clients from all nodes |
 | `ghostgate nodes` | List all configured nodes |
 | `ghostgate update` | Check for an update and apply it if available |

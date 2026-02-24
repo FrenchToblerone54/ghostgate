@@ -302,11 +302,12 @@ def cmd_edit(args):
     if "disable" in opts: updates["enabled"] = 0
     if "show-multiplier" in opts: updates["show_multiplier"] = max(1, int(opts["show-multiplier"]))
     if "remove-data" in opts: updates["data_gb"] = max(0, (sub.get("data_gb") or 0) - float(opts["remove-data"]))
-    if "remove-days" in opts and sub.get("expire_at"):
+    if "no-expire" in opts: updates["expire_at"] = None
+    elif "remove-days" in opts and sub.get("expire_at"):
         try: updates["expire_at"] = (datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc) - timedelta(days=int(opts["remove-days"]))).isoformat()
         except Exception: pass
     if not updates:
-        console.print(f"[{WARN}]Nothing to update. Use --data, --days, --remove-data, --remove-days, --comment, --ip, --enable, --disable[/]")
+        console.print(f"[{WARN}]Nothing to update. Use --data, --days, --remove-data, --remove-days, --no-expire, --comment, --ip, --enable, --disable[/]")
         return
     db.update_sub(sub["id"], **updates)
     if "enabled" in updates:
@@ -348,7 +349,7 @@ def cmd_help(args):
         f"  [{ACC}]list[/] [{MUTED}][--search X][/]                          List all subscriptions",
         f"  [{ACC}]stats[/] [{MUTED}]<id|comment>[/]                         Show detailed subscription info",
         f"  [{ACC}]create[/] [{MUTED}]--comment X [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none][/]",
-        f"  [{ACC}]edit[/] [{MUTED}]<id|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--comment X] [--ip N] [--enable] [--disable][/]",
+        f"  [{ACC}]edit[/] [{MUTED}]<id|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable][/]",
         f"  [{ACC}]delete[/] [{MUTED}]<id|comment>[/]                         Delete subscription",
         f"  [{ACC}]nodes[/]                                       List nodes",
         f"  [{ACC}]status[/]                                      System overview",

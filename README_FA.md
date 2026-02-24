@@ -45,7 +45,7 @@ sudo ./install.sh
 /delete <آیدی یا کامنت>
 /stats <آیدی یا کامنت>
 /list [صفحه]
-/edit <آیدی یا کامنت> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--ip N] [--enable] [--disable]
+/edit <آیدی یا کامنت> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
 /nodes
 ```
 
@@ -81,7 +81,7 @@ sudo ./install.sh
 | `GET` | `/api/subscriptions` | لیست اشتراک‌ها. پارامترها: `page`، `per_page` (0 = همه)، `search` |
 | `POST` | `/api/subscriptions` | ایجاد اشتراک و افزودن به نودها |
 | `GET` | `/api/subscriptions/<id>` | دریافت اشتراک همراه با لیست نودها |
-| `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit`، `enabled`، `remove_days` |
+| `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit`، `enabled`، `remove_days`، `remove_expiry` |
 | `DELETE` | `/api/subscriptions/<id>` | حذف اشتراک و حذف کلاینت از تمام نودها |
 | `GET` | `/api/subscriptions/<id>/stats` | دریافت آمار ترافیک |
 | `GET` | `/api/subscriptions/<id>/qr` | تصویر PNG کد QR برای لینک اشتراک |
@@ -253,7 +253,7 @@ sudo journalctl -u ghostgate -f
 | `ghostgate list [--search X]` | لیست تمام اشتراک‌ها، با فیلتر جستجوی اختیاری |
 | `ghostgate stats <آیدی\|کامنت>` | نمایش آمار ترافیک یک اشتراک |
 | `ghostgate create --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | ایجاد اشتراک جدید |
-| `ghostgate edit <آیدی\|کامنت> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--comment X] [--ip N] [--enable] [--disable]` | ویرایش اشتراک موجود |
+| `ghostgate edit <آیدی\|کامنت> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable]` | ویرایش اشتراک موجود |
 | `ghostgate delete <آیدی\|کامنت>` | حذف اشتراک و حذف کلاینت‌های آن از تمام نودها |
 | `ghostgate nodes` | لیست تمام نودهای تنظیم‌شده |
 | `ghostgate update` | بررسی به‌روزرسانی و اعمال آن در صورت وجود |

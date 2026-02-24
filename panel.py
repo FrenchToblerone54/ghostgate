@@ -300,7 +300,9 @@ def register_routes(panel_path):
     def api_sub_update(sub_id):
         body = request.json
         updates = {k: body[k] for k in ["comment", "data_gb", "days", "ip_limit", "enabled", "show_multiplier"] if k in body}
-        if "remove_days" in body and int(body["remove_days"]) > 0:
+        if body.get("remove_expiry"):
+            updates["expire_at"] = None
+        elif "remove_days" in body and int(body["remove_days"]) > 0:
             sub = db.get_sub(sub_id)
             if sub and sub.get("expire_at"):
                 try:

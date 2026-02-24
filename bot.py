@@ -62,7 +62,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/create [--comment X] [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none]\n"
         "/delete <id or comment>\n"
         "/stats <id or comment>\n"
-        "/edit <id or comment> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--ip N] [--enable] [--disable]\n"
+        "/edit <id or comment> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]\n"
         "/list [page] — 10 per page\n"
         "/nodes\n"
         "/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...] [--multiplier N]\n"
@@ -240,7 +240,9 @@ async def cmd_edit(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         updates["enabled"] = 0
     if "remove-data" in opts:
         updates["data_gb"] = max(0, (sub.get("data_gb") or 0) - float(opts["remove-data"]))
-    if "remove-days" in opts and sub.get("expire_at"):
+    if "no-expire" in opts:
+        updates["expire_at"] = None
+    elif "remove-days" in opts and sub.get("expire_at"):
         try:
             updates["expire_at"] = (datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc) - timedelta(days=int(opts["remove-days"]))).isoformat()
         except Exception:
