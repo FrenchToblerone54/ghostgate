@@ -1,0 +1,45 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 0.4.4)"
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Ensure python3.13 alias
+        run: |
+          if ! command -v python3.13 >/dev/null 2>&1; then
+            sudo ln -sf "$(which python)" /usr/local/bin/python3.13
+          fi
+      - name: Verify version matches updater.py
+        run: |
+          v="$(python -c 'import re, pathlib; txt=pathlib.Path("updater.py").read_text(); m=re.search(r"^VERSION\\s*=\\s*\\\"([^\\\"]+)\\\"", txt, re.M); print(m.group(1) if m else "")')"
+          if [ "$v" != "${{ inputs.version }}" ]; then
+            echo "updater.py VERSION=$v does not match input version=${{ inputs.version }}"
+            exit 1
+          fi
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+      - name: Build
+        run: |
+          bash build/build.sh
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: v${{ inputs.version }}
+          name: v${{ inputs.version }}
+          artifacts: dist/ghostgate,dist/ghostgate.sha256
+          allowUpdates: true
+          generateReleaseNotes: true

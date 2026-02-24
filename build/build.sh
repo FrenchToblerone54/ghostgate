@@ -5,7 +5,7 @@ echo "Building GhostGate binary..."
 
 cd "$(dirname "$0")/.."
 
-python3.13 -m PyInstaller --onefile --name ghostgate --add-data "frontend:frontend" main.py
+python3.13 -m PyInstaller --onefile --name ghostgate --add-data "frontend:frontend" --collect-all rich main.py
 
 echo "Generating checksum..."
 cd dist
