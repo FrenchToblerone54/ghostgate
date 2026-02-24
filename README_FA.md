@@ -241,11 +241,38 @@ sudo journalctl -u ghostgate -f
 
 ## دستورات CLI
 
+خروجی CLI با استفاده از کتابخانه [rich](https://github.com/Textualize/rich) رنگ‌آمیزی شده و با تم پنل هماهنگ است.
+
+| دستور | توضیح |
+|---|---|
+| `ghostgate` | اجرای سرویس (حالت معمول) |
+| `ghostgate --version` | نمایش نسخه و خروج |
+| `ghostgate --generate-path` | تولید مسیر تصادفی جدید برای پنل و خروج |
+| `ghostgate help` | نمایش راهنمای CLI و دستورات موجود |
+| `ghostgate status` | نمایش وضعیت سیستم (CPU، RAM، دیسک، آپتایم) |
+| `ghostgate list [--search X]` | لیست تمام اشتراک‌ها، با فیلتر جستجوی اختیاری |
+| `ghostgate stats <آیدی\|کامنت>` | نمایش آمار ترافیک یک اشتراک |
+| `ghostgate create --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | ایجاد اشتراک جدید |
+| `ghostgate edit <آیدی\|کامنت> [--data GB] [--days N] [--comment X] [--ip N] [--enable] [--disable]` | ویرایش اشتراک موجود |
+| `ghostgate delete <آیدی\|کامنت>` | حذف اشتراک و حذف کلاینت‌های آن از تمام نودها |
+| `ghostgate nodes` | لیست تمام نودهای تنظیم‌شده |
+| `ghostgate update` | بررسی به‌روزرسانی و اعمال آن در صورت وجود |
+
+**مثال‌ها:**
+
 ```bash
-ghostgate                  # اجرای سرویس (حالت معمول)
-ghostgate --version        # نمایش نسخه و خروج
-ghostgate --generate-path  # تولید مسیر تصادفی جدید برای پنل
-ghostgate update           # بررسی به‌روزرسانی و اعمال آن در صورت وجود
+ghostgate list
+ghostgate list --search علی
+ghostgate stats abc123
+ghostgate create --comment "علی رضایی" --data 50 --days 30 --ip 2 --nodes 1,2
+ghostgate edit abc123 --data 100 --days 60
+ghostgate edit abc123 --disable
+ghostgate delete abc123
+ghostgate nodes
+ghostgate status
+ghostgate update
+ghostgate --version
+ghostgate --generate-path
 ```
 
 ## بیلد از سورس

@@ -233,11 +233,38 @@ sudo journalctl -u ghostgate -f
 
 ## CLI Commands
 
+The CLI uses [rich](https://github.com/Textualize/rich) for colored terminal output matching the panel theme.
+
+| Command | Description |
+|---|---|
+| `ghostgate` | Start the service (normal mode) |
+| `ghostgate --version` | Print version and exit |
+| `ghostgate --generate-path` | Generate a new random panel path and exit |
+| `ghostgate help` | Show CLI help and available commands |
+| `ghostgate status` | Show system status (CPU, RAM, disk, uptime) |
+| `ghostgate list [--search X]` | List all subscriptions, with optional search filter |
+| `ghostgate stats <id\|comment>` | Show traffic stats for a subscription |
+| `ghostgate create --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | Create a new subscription |
+| `ghostgate edit <id\|comment> [--data GB] [--days N] [--comment X] [--ip N] [--enable] [--disable]` | Edit an existing subscription |
+| `ghostgate delete <id\|comment>` | Delete a subscription and remove its clients from all nodes |
+| `ghostgate nodes` | List all configured nodes |
+| `ghostgate update` | Check for an update and apply it if available |
+
+**Examples:**
+
 ```bash
-ghostgate                  # Start the service (normal mode)
-ghostgate --version        # Print version and exit
-ghostgate --generate-path  # Generate a new random panel path
-ghostgate update           # Check for an update and apply it if available
+ghostgate list
+ghostgate list --search alice
+ghostgate stats abc123
+ghostgate create --comment "Alice" --data 50 --days 30 --ip 2 --nodes 1,2
+ghostgate edit abc123 --data 100 --days 60
+ghostgate edit abc123 --disable
+ghostgate delete abc123
+ghostgate nodes
+ghostgate status
+ghostgate update
+ghostgate --version
+ghostgate --generate-path
 ```
 
 ## Building from Source
