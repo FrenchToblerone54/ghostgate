@@ -227,6 +227,9 @@ def cmd_create(args):
     else:
         node_ids = [int(x) for x in node_ids_raw.split(",")]
     custom_id = opts.get("id") or None
+    if custom_id and db.get_sub(custom_id):
+        console.print(f"[{DANGER}]ID already exists: {custom_id}[/]")
+        return
     sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, sub_id=custom_id)
     sub = db.get_sub(sub_id)
     client_uuid = str(uuid.uuid4())
