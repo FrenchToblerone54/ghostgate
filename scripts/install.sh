@@ -66,6 +66,13 @@ if [ ! -f /opt/ghostgate/.env ]; then
     read -p "Bot proxy URL (leave empty if not needed): " BOT_PROXY
 
     echo ""
+    read -p "Update proxy URL (leave empty if not needed): " UPDATE_PROXY
+
+    echo ""
+    read -p "Panel worker threads [8]: " PANEL_THREADS
+    PANEL_THREADS=${PANEL_THREADS:-8}
+
+    echo ""
     read -p "Enable auto-update? [Y/n]: " AUTO_UPDATE_INPUT
     AUTO_UPDATE_INPUT=${AUTO_UPDATE_INPUT:-y}
     if [[ $AUTO_UPDATE_INPUT =~ ^[Yy]$ ]]; then
@@ -85,6 +92,8 @@ HOST=${HOST}
 PORT=${PORT}
 SYNC_INTERVAL=${SYNC_INTERVAL}
 BOT_PROXY=${BOT_PROXY}
+UPDATE_PROXY=${UPDATE_PROXY}
+PANEL_THREADS=${PANEL_THREADS}
 DB_PATH=/opt/ghostgate/ghostgate.db
 LOG_FILE=/var/log/ghostgate.log
 ENV_PATH=/opt/ghostgate/.env

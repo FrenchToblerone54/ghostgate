@@ -61,10 +61,12 @@ sudo ./install.sh
 | `PORT` | `5000` | پورت شنود |
 | `SYNC_INTERVAL` | `20` | فاصله همگام‌سازی ترافیک به ثانیه |
 | `BOT_PROXY` | | پروکسی HTTP برای ربات تلگرام (اختیاری) |
+| `UPDATE_PROXY` | | پروکسی HTTP برای به‌روزرسان خودکار (اختیاری) |
+| `PANEL_THREADS` | `8` | تعداد thread های Waitress |
 | `DB_PATH` | `/opt/ghostgate/ghostgate.db` | مسیر دیتابیس SQLite |
 | `LOG_FILE` | `/var/log/ghostgate.log` | مسیر فایل لاگ |
 | `AUTO_UPDATE` | `false` | فعال‌سازی به‌روزرسانی خودکار باینری |
-| `UPDATE_CHECK_INTERVAL` | `3600` | فاصله بررسی به‌روزرسانی به ثانیه |
+| `UPDATE_CHECK_INTERVAL` | `300` | فاصله بررسی به‌روزرسانی به ثانیه |
 
 ## REST API
 

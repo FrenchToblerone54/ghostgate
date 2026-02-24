@@ -52,10 +52,12 @@ All settings are stored in `/opt/ghostgate/.env`. They can also be edited from t
 | `PORT` | `5000` | Listen port |
 | `SYNC_INTERVAL` | `20` | Traffic sync interval in seconds |
 | `BOT_PROXY` | | HTTP proxy for Telegram bot (optional) |
+| `UPDATE_PROXY` | | HTTP proxy for auto-updater (optional) |
+| `PANEL_THREADS` | `8` | Waitress worker thread count |
 | `DB_PATH` | `/opt/ghostgate/ghostgate.db` | SQLite database path |
 | `LOG_FILE` | `/var/log/ghostgate.log` | Log file path |
 | `AUTO_UPDATE` | `false` | Enable automatic binary updates |
-| `UPDATE_CHECK_INTERVAL` | `3600` | Seconds between update checks |
+| `UPDATE_CHECK_INTERVAL` | `300` | Seconds between update checks |
 
 ## REST API
 

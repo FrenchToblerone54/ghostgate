@@ -7,18 +7,22 @@ import threading
 import logging
 import requests
 
-VERSION = "0.1.6"
+VERSION = "0.1.7"
 GITHUB_REPO = "frenchtoblerone54/ghostgate"
 _logger = logging.getLogger("updater")
 
 def _ver_gt(a, b):
     return tuple(int(x) for x in a.lstrip("v").split(".")) > tuple(int(x) for x in b.lstrip("v").split("."))
 
+def _proxies():
+    p = os.getenv("UPDATE_PROXY", "").strip()
+    return {"http": p, "https": p} if p else None
+
 def check_update():
     if not getattr(sys, "frozen", False):
         return {"current": VERSION, "latest": VERSION, "update_available": False}
     try:
-        r = requests.get(f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest", timeout=10)
+        r = requests.get(f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest", timeout=10, proxies=_proxies())
         data = r.json()
         latest = data.get("tag_name", VERSION).lstrip("v")
         return {"current": VERSION, "latest": latest, "update_available": _ver_gt(latest, VERSION)}
@@ -29,7 +33,7 @@ def apply_update():
     if not getattr(sys, "frozen", False):
         return False
     try:
-        r = requests.get(f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest", timeout=10)
+        r = requests.get(f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest", timeout=10, proxies=_proxies())
         data = r.json()
         latest = data.get("tag_name", VERSION).lstrip("v")
         if not _ver_gt(latest, VERSION):
@@ -40,10 +44,10 @@ def apply_update():
         if not bin_url or not sha_url:
             return False
         tmp = sys.executable + ".new"
-        with requests.get(bin_url, stream=True, timeout=120) as dl:
+        with requests.get(bin_url, stream=True, timeout=120, proxies=_proxies()) as dl:
             with open(tmp, "wb") as f:
                 shutil.copyfileobj(dl.raw, f)
-        sha_expected = requests.get(sha_url, timeout=10).text.split()[0]
+        sha_expected = requests.get(sha_url, timeout=10, proxies=_proxies()).text.split()[0]
         sha_actual = hashlib.sha256(open(tmp, "rb").read()).hexdigest()
         if sha_actual != sha_expected:
             os.unlink(tmp)

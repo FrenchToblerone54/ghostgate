@@ -406,6 +406,7 @@ Refresh
 <div class="fg"><label class="fl">Port</label><input class="fi" id="cfg-port" type="number" placeholder="5000"></div>
 </div>
 <div class="fg"><label class="fl">Sync Interval (seconds)</label><input class="fi" id="cfg-sync" type="number" placeholder="20"></div>
+<div class="fg"><label class="fl">Panel Worker Threads</label><input class="fi" id="cfg-threads" type="number" placeholder="8"></div>
 <div class="fg"><label class="fl">Log File</label><input class="fi" id="cfg-log" placeholder="/var/log/ghostgate.log"></div>
 </div>
 </div>
@@ -415,6 +416,7 @@ Refresh
 <div class="fg"><label class="fl">Bot Token</label><input class="fi" id="cfg-token" type="password" placeholder="123456:ABC-DEF..."></div>
 <div class="fg"><label class="fl">Admin User ID</label><input class="fi" id="cfg-admin" placeholder="123456789"></div>
 <div class="fg"><label class="fl">Bot Proxy (optional)</label><input class="fi" id="cfg-proxy" placeholder="http://proxy:3128"></div>
+<div class="fg"><label class="fl">Update Proxy (optional)</label><input class="fi" id="cfg-update-proxy" placeholder="http://proxy:3128"></div>
 </div>
 </div>
 </div>
@@ -858,10 +860,12 @@ async function loadSettings(){
   document.getElementById("cfg-host").value=s.HOST||"";
   document.getElementById("cfg-port").value=s.PORT||"";
   document.getElementById("cfg-sync").value=s.SYNC_INTERVAL||"20";
+  document.getElementById("cfg-threads").value=s.PANEL_THREADS||"8";
   document.getElementById("cfg-log").value=s.LOG_FILE||"";
   document.getElementById("cfg-token").value=s.BOT_TOKEN||"";
   document.getElementById("cfg-admin").value=s.ADMIN_ID||"";
   document.getElementById("cfg-proxy").value=s.BOT_PROXY||"";
+  document.getElementById("cfg-update-proxy").value=s.UPDATE_PROXY||"";
 }
 async function saveSettings(){
   const body={
@@ -870,10 +874,12 @@ async function saveSettings(){
     HOST:document.getElementById("cfg-host").value.trim(),
     PORT:document.getElementById("cfg-port").value.trim(),
     SYNC_INTERVAL:document.getElementById("cfg-sync").value.trim(),
+    PANEL_THREADS:document.getElementById("cfg-threads").value.trim(),
     LOG_FILE:document.getElementById("cfg-log").value.trim(),
     BOT_TOKEN:document.getElementById("cfg-token").value.trim(),
     ADMIN_ID:document.getElementById("cfg-admin").value.trim(),
-    BOT_PROXY:document.getElementById("cfg-proxy").value.trim()
+    BOT_PROXY:document.getElementById("cfg-proxy").value.trim(),
+    UPDATE_PROXY:document.getElementById("cfg-update-proxy").value.trim()
   };
   Object.keys(body).forEach(k=>{if(!body[k])delete body[k];});
   await fetch(API+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});

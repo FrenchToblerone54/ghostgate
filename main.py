@@ -92,7 +92,7 @@ def main():
 
     def _run_flask():
         logger.info(f"Panel running at http://{host}:{port}/{panel_path}/")
-        serve(panel.app, host=host, port=port, threads=8)
+        serve(panel.app, host=host, port=port, threads=int(os.getenv("PANEL_THREADS", "8")))
 
     flask_thread = threading.Thread(target=_run_flask, daemon=True)
     flask_thread.start()
