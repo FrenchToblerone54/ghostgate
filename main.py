@@ -52,18 +52,13 @@ def _migrate(old_db_path, node_id):
     conn.close()
     print(f"Migrated {count}/{len(configs)} subscriptions from {old_db_path}")
 
+_CLI_COMMANDS = {"list", "stats", "nodes", "status", "create", "delete", "edit", "update", "help"}
+
 def main():
-    if "update" in sys.argv[1:]:
-        print(f"Current version: v{updater.VERSION}")
-        print("Checking for updates...")
-        info = updater.check_update()
-        if not info.get("update_available"):
-            print("Already up to date.")
-        else:
-            print(f"Update found: v{info['latest']}")
-            print("Downloading and applying update...")
-            updater.apply_update()
-            print("Update failed — check logs")
+    cli_args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if cli_args and cli_args[0] in _CLI_COMMANDS:
+        import cli
+        cli.dispatch(cli_args[0], sys.argv[2:])
         sys.exit(0)
 
     parser = argparse.ArgumentParser(description="GhostGate - VPN Subscription Manager")

@@ -1,4 +1,5 @@
 import os
+import asyncio
 import logging
 import time
 import uuid
@@ -318,11 +319,20 @@ def _build_app():
     application.add_handler(CommandHandler("delnode", cmd_delnode))
     return application
 
+async def _run_once():
+    app = _build_app()
+    async with app:
+        await app.start()
+        await app.updater.start_polling(drop_pending_updates=True)
+        await asyncio.sleep(float("inf"))
+
 def start():
     while True:
         try:
-            application = _build_app()
-            application.run_polling(drop_pending_updates=True)
+            asyncio.run(_run_once())
+        except (KeyboardInterrupt, SystemExit):
+            break
         except Exception as e:
             logger.error(f"bot crashed: {e}, restarting in 5s")
             time.sleep(5)
+
