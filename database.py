@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     used_bytes INTEGER DEFAULT 0,
     expire_at TIMESTAMP,
     enabled INTEGER DEFAULT 1,
+    show_multiplier INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS subscription_nodes (
@@ -74,6 +75,10 @@ CREATE INDEX IF NOT EXISTS idx_al_sub ON access_logs(sub_id);
             c.execute("ALTER TABLE access_logs ADD COLUMN user_agent TEXT")
         except Exception:
             pass
+        try:
+            c.execute("ALTER TABLE subscriptions ADD COLUMN show_multiplier INTEGER DEFAULT 1")
+        except Exception:
+            pass
 
 def add_node(name, address, username, password, inbound_id, proxy_url=None):
     with _conn() as c:
@@ -105,13 +110,13 @@ def delete_node(node_id):
     with _conn() as c:
         c.execute("DELETE FROM nodes WHERE id=?", (node_id,))
 
-def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True):
+def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True, show_multiplier=1):
     sub_id = sub_id or generate(size=20)
     expire_at = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat() if days > 0 else None
     with _conn() as c:
         c.execute(
-            "INSERT INTO subscriptions (id, comment, data_gb, days, ip_limit, expire_at, enabled) VALUES (?,?,?,?,?,?,?)",
-            (sub_id, comment, data_gb, days, ip_limit, expire_at, int(enabled))
+            "INSERT INTO subscriptions (id, comment, data_gb, days, ip_limit, expire_at, enabled, show_multiplier) VALUES (?,?,?,?,?,?,?,?)",
+            (sub_id, comment, data_gb, days, ip_limit, expire_at, int(enabled), max(1, int(show_multiplier)))
         )
     return sub_id
 
@@ -147,7 +152,7 @@ def get_sub_by_comment(comment):
         return dict(r) if r else None
 
 def update_sub(sub_id, **kwargs):
-    allowed = {"comment", "data_gb", "days", "ip_limit", "used_bytes", "expire_at", "enabled"}
+    allowed = {"comment", "data_gb", "days", "ip_limit", "used_bytes", "expire_at", "enabled", "show_multiplier"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if "days" in kwargs and kwargs["days"] > 0 and "expire_at" not in kwargs:
         fields["expire_at"] = (datetime.now(timezone.utc) + timedelta(days=int(kwargs["days"]))).isoformat()

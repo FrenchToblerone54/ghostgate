@@ -81,6 +81,7 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     data_gb = float(opts.get("data", 0))
     days = int(opts.get("days", 0))
     ip_limit = int(opts.get("ip", 0))
+    show_multiplier = max(1, int(opts.get("show-multiplier", 1)))
     nodes_str = opts.get("nodes", "all")
     all_nodes = db.get_nodes()
     if not all_nodes:
@@ -92,7 +93,7 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         node_ids = []
     else:
         node_ids = [int(x.strip()) for x in nodes_str.split(",") if x.strip().isdigit()]
-    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit)
+    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier)
     sub = db.get_sub(sub_id)
     client_uuid = str(uuid.uuid4())
     expire_ms = 0
@@ -125,8 +126,9 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"Data: {data_str}\n"
         f"Expires: {expire_str}\n"
         f"IP Limit: {ip_limit or 'Unlimited'}\n"
-        f"Nodes: {_html.escape(nodes_str_out)}\n\n"
-        f"Link: <tg-spoiler>{_html.escape(sub_link)}</tg-spoiler>"
+        f"Nodes: {_html.escape(nodes_str_out)}\n"
+        + (f"Show ×{show_multiplier}\n" if show_multiplier > 1 else "")
+        + f"\nLink: <tg-spoiler>{_html.escape(sub_link)}</tg-spoiler>"
     )
     await update.message.reply_text(msg, parse_mode="HTML")
     qr_buf = _make_qr_bytes(sub_link)
@@ -171,13 +173,15 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     total = f"{stats['data_gb']} GB" if stats["data_gb"] > 0 else "Unlimited"
     expire = stats["expire_at"][:10] if stats.get("expire_at") else "Never"
     nodes = ", ".join(stats.get("nodes") or []) or "None"
+    sm = stats.get("show_multiplier") or 1
     msg = (
         f"Stats: {stats.get('comment') or stats['id']}\n\n"
         f"Data: {used} / {total}\n"
         f"Expires: {expire}\n"
         f"IP Limit: {stats['ip_limit'] or 'Unlimited'}\n"
         f"Nodes: {nodes}\n"
-        f"Accesses: {stats['access_count']}\n"
+        + (f"Show ×{sm}\n" if sm > 1 else "")
+        + f"Accesses: {stats['access_count']}\n"
         f"First: {stats.get('first_access') or '-'}\n"
         f"Last: {stats.get('last_access') or '-'}"
     )
@@ -227,6 +231,8 @@ async def cmd_edit(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         updates["days"] = int(opts["days"])
     if "ip" in opts:
         updates["ip_limit"] = int(opts["ip"])
+    if "show-multiplier" in opts:
+        updates["show_multiplier"] = max(1, int(opts["show-multiplier"]))
     if updates:
         db.update_sub(sub["id"], **updates)
     await update.message.reply_text(f"Updated: {sub.get('comment') or sub['id']}")

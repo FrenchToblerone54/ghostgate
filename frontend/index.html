@@ -466,6 +466,7 @@ Refresh
 <div class="fg"><label class="fl">Validity (days, 0=∞)</label><input class="fi" id="mc-days" type="number" value="30" min="0"></div>
 </div>
 <div class="fg"><label class="fl">IP Limit (0=∞)</label><input class="fi" id="mc-ip" type="number" value="0" min="0"></div>
+<div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="mc-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
 <div class="fg"><label class="fl">Nodes</label><div class="nodes-list" id="mc-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading nodes...</div></div></div>
 </div>
 <div class="modal-ft">
@@ -486,6 +487,7 @@ Refresh
 <div class="fg"><label class="fl">Add Days</label><input class="fi" id="me-days" type="number" value="0" min="0"></div>
 </div>
 <div class="fg"><label class="fl">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
+<div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="me-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
 <div class="fg"><label class="fl">Nodes</label><div class="nodes-list" id="me-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading...</div></div></div>
 </div>
 <div class="modal-ft">
@@ -691,6 +693,7 @@ async function openCreate(){
   document.getElementById("mc-days").value="30";
   document.getElementById("mc-ip").value="0";
   document.getElementById("mc-submit").textContent="Create";
+  document.getElementById("mc-sm").value="1";
   const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
   document.getElementById("mc-nodes").innerHTML=nodes.length===0
     ?'<div style="color:var(--text2);font-size:0.84em;padding:8px">No nodes configured. Add nodes in the Nodes section first.</div>'
@@ -704,10 +707,11 @@ async function submitCreate(){
   const days=parseInt(document.getElementById("mc-days").value)||0;
   const ip_limit=parseInt(document.getElementById("mc-ip").value)||0;
   const node_ids=[...document.querySelectorAll("#mc-nodes input:checked")].map(x=>parseInt(x.value));
+  const show_multiplier=parseInt(document.getElementById("mc-sm").value)||1;
   const btn=document.getElementById("mc-submit");
   btn.disabled=true; btn.textContent="Creating…";
   try{
-    const r=await fetch(API+"/api/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment,data_gb,days,ip_limit,node_ids})}).then(x=>x.json());
+    const r=await fetch(API+"/api/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment,data_gb,days,ip_limit,node_ids,show_multiplier})}).then(x=>x.json());
     if(r.errors&&r.errors.length>0) showAlert("mc-alert","Created (with errors): "+r.errors.join("; "),"err");
     else { closeM("m-create"); loadSubs(); showAlert("s-alert","Subscription created: "+r.id,"ok"); }
   }catch(ex){ showAlert("mc-alert","Error: "+ex,"err"); }
@@ -729,7 +733,8 @@ async function viewSub(id){
   const firstStr=stats.first_access?`<span title="${stats.first_access}">${fmtDate(stats.first_access)}</span>`:"—";
   const lastStr=stats.last_access?`<span title="${stats.last_access}">${fmtDate(stats.last_access)}</span>`:"—";
   const uaStr=stats.last_ua?`<span style="font-size:0.78em;color:var(--text2);word-break:break-all">${stats.last_ua}</span>`:"—";
-  document.getElementById("md-rows").innerHTML=[
+  const smVal=sub.show_multiplier||1;
+  const rows=[
     ["ID",`<span class="tbl-id">${id}</span>`],
     ["Comment",sub.comment||"—"],
     ["Data Used",used.toFixed(2)+" GB / "+totalStr],
@@ -741,7 +746,9 @@ async function viewSub(id){
     ["First Access",firstStr],
     ["Last Access",lastStr],
     ["Last Client",uaStr]
-  ].map(([k,v])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${v}</span></div>`).join("");
+  ];
+  if(smVal>1) rows.splice(5,0,["Show Multiplier",`<span style="color:var(--warning);font-weight:700">×${smVal}</span>`]);
+  document.getElementById("md-rows").innerHTML=rows.map(([k,v])=>`<div class="detail-row"><span class="dk">${k}</span><span class="dv">${v}</span></div>`).join("");
   document.getElementById("m-detail").classList.add("open");
 }
 
@@ -757,6 +764,7 @@ async function editSub(id){
   document.getElementById("me-data").value=sub.data_gb||0;
   document.getElementById("me-days").value=0;
   document.getElementById("me-ip").value=sub.ip_limit||0;
+  document.getElementById("me-sm").value=sub.show_multiplier||1;
   const assignedIds=new Set((sub.nodes||[]).map(n=>n.node_id));
   editingOrigNodes=new Set(assignedIds);
   document.getElementById("me-nodes").innerHTML=nodes.length?nodes.map(n=>`<label class="node-item"><input type="checkbox" value="${n.id}" ${assignedIds.has(n.id)?"checked":""}><div><div class="node-item-name">${n.name}</div><div class="node-item-addr">${n.address}</div></div></label>`).join(""):'<div style="color:var(--text2);font-size:0.85em;padding:8px">No nodes configured.</div>';
@@ -765,7 +773,7 @@ async function editSub(id){
 
 async function submitEdit(){
   if(!editingSubId) return;
-  const body={comment:document.getElementById("me-comment").value.trim(),data_gb:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0};
+  const body={comment:document.getElementById("me-comment").value.trim(),data_gb:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
   const days=parseInt(document.getElementById("me-days").value)||0;
   if(days>0) body.days=days;
   const checked=new Set([...document.querySelectorAll("#me-nodes input:checked")].map(i=>parseInt(i.value)));
@@ -992,6 +1000,11 @@ async function restartPanel(){
 
 function closeM(id){ document.getElementById(id).classList.remove("open"); }
 document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",function(e){ if(e.target===this) this.classList.remove("open"); }));
+let _advUnlocked=false;
+function _toggleAdv(){_advUnlocked=!_advUnlocked;document.querySelectorAll(".adv-field").forEach(el=>el.style.display=_advUnlocked?"":"none");}
+document.addEventListener("keydown",function(e){if(e.shiftKey&&e.ctrlKey&&e.key==="M")_toggleAdv();});
+let _tapCount=0,_tapTimer=null;
+document.querySelectorAll(".modal-hd h3").forEach(function(h){h.addEventListener("click",function(){_tapCount++;clearTimeout(_tapTimer);_tapTimer=setTimeout(()=>_tapCount=0,1500);if(_tapCount>=5){_tapCount=0;_toggleAdv();}});});
 </script>
 </body>
 </html>

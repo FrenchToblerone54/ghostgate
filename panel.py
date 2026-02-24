@@ -127,6 +127,7 @@ def sub_page(sub_id):
     snodes = db.get_sub_nodes(sub_id)
     base_url = BASE_URL or request.host_url.rstrip("/")
     sub_url = f"{base_url}/sub/{sub_id}"
+    sm = max(1, int(sub.get("show_multiplier") or 1))
     total_bytes = sub.get("used_bytes") or 0
     limit_bytes = int(sub["data_gb"] * 1073741824) if sub["data_gb"] > 0 else 0
     expire_ts = 0
@@ -139,8 +140,8 @@ def sub_page(sub_id):
     is_expired = expire_ts > 0 and expire_ts < now_ts
     is_over_limit = limit_bytes > 0 and total_bytes >= limit_bytes
     data_percent = min(100, int(total_bytes * 100 / limit_bytes)) if limit_bytes > 0 else 0
-    data_used_str = f"{total_bytes/1073741824:.2f} GB"
-    data_total_str = f"{sub['data_gb']:.1f} GB" if limit_bytes > 0 else "Unlimited"
+    data_used_str = f"{total_bytes*sm/1073741824:.2f} GB"
+    data_total_str = f"{sub['data_gb']*sm:.1f} GB" if limit_bytes > 0 else "Unlimited"
     if expire_ts > 0:
         diff = expire_ts - now_ts
         expire_str = f"{diff // 86400}d {(diff % 86400) // 3600}h" if diff > 0 else "Expired"
@@ -162,7 +163,7 @@ def sub_page(sub_id):
             data_label=data_label, expire_label=expire_label
         )
     configs = [
-        f"vless://00000000-0000-0000-0000-000000000001@0.0.0.0:443?type=tcp#{quote(f'{data_label}: {data_used_str} / {data_total_str}')}",
+        f"vless://00000000-0000-0000-0000-000000000001@0.0.0.0:443?type=tcp#{quote(f'{data_label}: {total_bytes*sm/1073741824:.2f} GB / {data_total_str}')}",
         f"vless://00000000-0000-0000-0000-000000000002@0.0.0.0:443?type=tcp#{quote(f'{expire_label}: {expire_str}')}",
     ]
     for sn in snodes:
@@ -194,7 +195,7 @@ def sub_page(sub_id):
     headers = {
         "Content-Type": "text/plain; charset=utf-8",
         "Profile-Title": base64.b64encode((sub.get("comment") or "GhostGate").encode()).decode(),
-        "subscription-userinfo": f"upload=0;download={total_bytes};total={limit_bytes};expire={expire_ts}",
+        "subscription-userinfo": f"upload=0;download={total_bytes*sm};total={limit_bytes*sm if limit_bytes else 0};expire={expire_ts}",
         "profile-update-interval": "1",
         "Content-Disposition": "attachment; filename=ghostgate",
         "profile-web-page-url": sub_url
@@ -257,8 +258,9 @@ def register_routes(panel_path):
         data_gb = float(data.get("data_gb", 0))
         days = int(data.get("days", 0))
         ip_limit = int(data.get("ip_limit", 0))
+        show_multiplier = max(1, int(data.get("show_multiplier", 1)))
         node_ids = [int(n) for n in data.get("node_ids", [])]
-        sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit)
+        sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier)
         sub = db.get_sub(sub_id)
         client_uuid = str(uuid.uuid4())
         expire_ms = 0
@@ -296,7 +298,7 @@ def register_routes(panel_path):
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>", methods=["PUT"])
     def api_sub_update(sub_id):
         body = request.json
-        updates = {k: body[k] for k in ["comment", "data_gb", "days", "ip_limit", "enabled"] if k in body}
+        updates = {k: body[k] for k in ["comment", "data_gb", "days", "ip_limit", "enabled", "show_multiplier"] if k in body}
         db.update_sub(sub_id, **updates)
         if "enabled" in body:
             enabled_val = bool(body["enabled"])

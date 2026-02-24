@@ -158,6 +158,8 @@ def cmd_stats(args):
         lines.append(f"  [{MUTED}]Last Access[/] [{MUTED}]{stats['last_access'][:16]}[/]")
     if stats.get("last_ua"):
         lines.append(f"  [{MUTED}]Last UA[/]     [{DIM}]{stats['last_ua'][:60]}[/]")
+    if (sub.get("show_multiplier") or 1) > 1:
+        lines.append(f"  [{MUTED}]Show ×[/]      [{WARN}]×{sub['show_multiplier']}[/]")
     title = f"[bold white]{sub.get('comment') or sub['id']}[/]  {_status_text(sub)}"
     console.print(Panel("\n".join(lines), title=title, border_style=DIM, padding=(0, 1)))
 
@@ -212,6 +214,7 @@ def cmd_create(args):
     data_gb = float(opts.get("data", opts.get("data-gb", 0)))
     days = int(opts.get("days", 0))
     ip_limit = int(opts.get("ip", 0))
+    show_multiplier = max(1, int(opts.get("show-multiplier", 1)))
     node_ids_raw = opts.get("nodes", "")
     all_nodes = db.get_nodes()
     if node_ids_raw == "all":
@@ -220,7 +223,7 @@ def cmd_create(args):
         node_ids = []
     else:
         node_ids = [int(x) for x in node_ids_raw.split(",")]
-    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit)
+    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier)
     sub = db.get_sub(sub_id)
     client_uuid = str(uuid.uuid4())
     expire_ms = 0
@@ -293,6 +296,7 @@ def cmd_edit(args):
     if "ip" in opts: updates["ip_limit"] = int(opts["ip"])
     if "enable" in opts: updates["enabled"] = 1
     if "disable" in opts: updates["enabled"] = 0
+    if "show-multiplier" in opts: updates["show_multiplier"] = max(1, int(opts["show-multiplier"]))
     if not updates:
         console.print(f"[{WARN}]Nothing to update. Use --data, --days, --comment, --ip, --enable, --disable[/]")
         return
