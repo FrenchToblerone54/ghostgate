@@ -2,6 +2,7 @@ import os
 import sys
 import uuid
 import shlex
+from dotenv import load_dotenv
 import psutil
 from datetime import datetime, timezone, timedelta
 from rich.console import Console
@@ -344,6 +345,7 @@ _COMMANDS = {
 }
 
 def dispatch(command, args):
+    load_dotenv(os.getenv("ENV_PATH", ".env"))
     db.init_db()
     fn = _COMMANDS.get(command)
     if fn:
