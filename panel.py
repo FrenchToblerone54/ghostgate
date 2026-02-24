@@ -523,11 +523,16 @@ def register_routes(panel_path):
             try:
                 with open(log_file) as f:
                     f.seek(0, 2)
+                    last_send = time.time()
                     while True:
                         line = f.readline()
                         if line:
                             yield f"data: {line.rstrip()}\n\n"
+                            last_send = time.time()
                         else:
+                            if time.time()-last_send >= 10:
+                                yield ": heartbeat\n\n"
+                                last_send = time.time()
                             time.sleep(0.5)
             except Exception:
                 pass
