@@ -15,7 +15,11 @@ from xui_client import XUIClient
 logger = logging.getLogger("bot")
 
 def _is_admin(user_id):
-    return str(user_id) == os.getenv("ADMIN_ID", "")
+    admin = os.getenv("ADMIN_ID", "").strip()
+    if str(user_id) != admin:
+        logger.warning(f"unauthorized access attempt from user_id={user_id} (expected {admin!r})")
+        return False
+    return True
 
 def _parse_opts(args):
     opts = {}
@@ -237,6 +241,9 @@ async def cmd_nodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lines.append(f"[{n['id']}] {n['name']} - {n['address']} - inbound:{n['inbound_id']} - {status}")
     await update.message.reply_text("\n".join(lines))
 
+async def _error_handler(update, ctx):
+    logger.error(f"bot error: {ctx.error}", exc_info=ctx.error)
+
 def _build_app():
     token = os.getenv("BOT_TOKEN", "")
     proxy = os.getenv("BOT_PROXY", "")
@@ -245,6 +252,7 @@ def _build_app():
     if proxy:
         builder = builder.proxy(proxy)
     application = builder.build()
+    application.add_error_handler(_error_handler)
     application.add_handler(CommandHandler("start", cmd_start))
     application.add_handler(CommandHandler("help", cmd_start))
     application.add_handler(CommandHandler("create", cmd_create))
