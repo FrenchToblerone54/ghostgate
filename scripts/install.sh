@@ -89,7 +89,7 @@ DB_PATH=/opt/ghostgate/ghostgate.db
 LOG_FILE=/var/log/ghostgate.log
 ENV_PATH=/opt/ghostgate/.env
 AUTO_UPDATE=${AUTO_UPDATE}
-UPDATE_CHECK_INTERVAL=3600
+UPDATE_CHECK_INTERVAL=300
 EOF
 
     chmod 600 /opt/ghostgate/.env
@@ -195,6 +195,7 @@ fi
 echo "Enabling and starting GhostGate..."
 systemctl enable ghostgate
 if systemctl is-active --quiet ghostgate; then
+    echo "Restarting existing service..."
     systemctl restart ghostgate
 else
     systemctl start ghostgate
@@ -202,17 +203,17 @@ fi
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════╗"
-echo "║               GhostGate Installation Complete             ║"
+echo "║               GhostGate Installation Complete            ║"
 echo "╠══════════════════════════════════════════════════════════╣"
-echo "║                                                            ║"
-echo "║  Panel URL:                                                ║"
+echo "║                                                          ║"
+echo "║  Panel URL:                                              ║"
 echo "║  ${BASE_URL}/${PANEL_PATH}/                               "
-echo "║                                                            ║"
-echo "║  ⚠  Save this URL! It is your admin panel access path.   ║"
-echo "║                                                            ║"
+echo "║                                                          ║"
+echo "║  ⚠  Save this URL! It is your admin panel access path.  ║"
+echo "║                                                          ║"
 echo "╠══════════════════════════════════════════════════════════╣"
-echo "║  Useful commands:                                          ║"
-echo "║  sudo systemctl status ghostgate                          ║"
-echo "║  sudo systemctl restart ghostgate                         ║"
-echo "║  sudo journalctl -u ghostgate -f                          ║"
+echo "║  Useful commands:                                        ║"
+echo "║  sudo systemctl status ghostgate                         ║"
+echo "║  sudo systemctl restart ghostgate                        ║"
+echo "║  sudo journalctl -u ghostgate -f                         ║"
 echo "╚══════════════════════════════════════════════════════════╝"

@@ -250,7 +250,7 @@ def _build_app():
     builder = ApplicationBuilder().token(token)
     builder = builder.connect_timeout(30.0).read_timeout(30.0).write_timeout(30.0).pool_timeout(30.0)
     if proxy:
-        builder = builder.proxy(proxy)
+        builder = builder.proxy(proxy).get_updates_proxy(proxy)
     application = builder.build()
     application.add_error_handler(_error_handler)
     application.add_handler(CommandHandler("start", cmd_start))
