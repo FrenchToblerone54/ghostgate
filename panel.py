@@ -423,9 +423,17 @@ def register_routes(panel_path):
                 total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
                 email = f"{sub_id}-{node_id}"
                 client = xui.make_client(email, client_uuid, expiry_time, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
+                now = datetime.now(timezone.utc)
+                is_disabled = sub.get("enabled") == 0
+                is_expired = sub.get("expire_at") and datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc) < now
+                is_over_limit = sub["data_gb"] > 0 and (sub.get("used_bytes") or 0) >= sub["data_gb"] * 1073741824
+                if is_disabled or is_expired or is_over_limit:
+                    client["enable"] = False
                 ok = xui.add_client(node["inbound_id"], client)
                 if ok:
                     db.add_sub_node(sub_id, node_id, client_uuid, email)
+                    if is_disabled or is_expired or is_over_limit:
+                        db.set_sub_node_disabled(sub_id, node_id, True)
                 else:
                     errors.append(f"node {node_id}: failed to add client")
             except Exception as e:
@@ -478,9 +486,17 @@ def register_routes(panel_path):
                         total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
                         email = f"{sub_id}-{node_id}"
                         client = xui.make_client(email, client_uuid, expiry_time, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
+                        now = datetime.now(timezone.utc)
+                        is_disabled = sub.get("enabled") == 0
+                        is_expired = sub.get("expire_at") and datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc) < now
+                        is_over_limit = sub["data_gb"] > 0 and (sub.get("used_bytes") or 0) >= sub["data_gb"] * 1073741824
+                        if is_disabled or is_expired or is_over_limit:
+                            client["enable"] = False
                         ok = xui.add_client(node["inbound_id"], client)
                         if ok:
                             db.add_sub_node(sub_id, node_id, client_uuid, email)
+                            if is_disabled or is_expired or is_over_limit:
+                                db.set_sub_node_disabled(sub_id, node_id, True)
                         else:
                             errors.append(f"{sub_id}/node {node_id}: failed")
                     except Exception as e:
