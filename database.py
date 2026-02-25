@@ -50,6 +50,7 @@ CREATE TABLE subscriptions (
     expire_at TIMESTAMP,
     enabled INTEGER DEFAULT 1,
     show_multiplier INTEGER DEFAULT 1,
+    expire_after_first_use_seconds INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE subscription_nodes (
@@ -126,6 +127,8 @@ CREATE INDEX IF NOT EXISTS idx_al_sub ON access_logs(sub_id);
                 c.execute("ALTER TABLE nodes ADD COLUMN traffic_multiplier REAL DEFAULT 1.0")
             if not _col_exists("subscription_nodes", "client_disabled"):
                 c.execute("ALTER TABLE subscription_nodes ADD COLUMN client_disabled INTEGER DEFAULT 0")
+            if not _col_exists("subscriptions", "expire_after_first_use_seconds"):
+                c.execute("ALTER TABLE subscriptions ADD COLUMN expire_after_first_use_seconds INTEGER DEFAULT 0")
             c.execute("PRAGMA user_version=1")
 
 def add_node(name, address, username, password, inbound_id, proxy_url=None, traffic_multiplier=1.0):
@@ -158,13 +161,13 @@ def delete_node(node_id):
     with _conn() as c:
         c.execute("DELETE FROM nodes WHERE id=?", (node_id,))
 
-def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True, show_multiplier=1):
+def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True, show_multiplier=1, expire_after_first_use_seconds=0):
     sub_id = sub_id or generate(size=20)
-    expire_at = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat() if days > 0 else None
+    expire_at = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat() if days > 0 and not expire_after_first_use_seconds else None
     with _conn() as c:
         c.execute(
-            "INSERT INTO subscriptions (id, comment, data_gb, days, ip_limit, expire_at, enabled, show_multiplier) VALUES (?,?,?,?,?,?,?,?)",
-            (sub_id, comment, data_gb, days, ip_limit, expire_at, int(enabled), max(1, int(show_multiplier)))
+            "INSERT INTO subscriptions (id, comment, data_gb, days, ip_limit, expire_at, enabled, show_multiplier, expire_after_first_use_seconds) VALUES (?,?,?,?,?,?,?,?,?)",
+            (sub_id, comment, data_gb, days, ip_limit, expire_at, int(enabled), max(1, int(show_multiplier)), int(expire_after_first_use_seconds))
         )
     return sub_id
 
@@ -200,9 +203,9 @@ def get_sub_by_comment(comment):
         return dict(r) if r else None
 
 def update_sub(sub_id, **kwargs):
-    allowed = {"comment", "data_gb", "days", "ip_limit", "used_bytes", "expire_at", "enabled", "show_multiplier"}
+    allowed = {"comment", "data_gb", "days", "ip_limit", "used_bytes", "expire_at", "enabled", "show_multiplier", "expire_after_first_use_seconds"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
-    if "days" in kwargs and kwargs["days"] > 0 and "expire_at" not in kwargs:
+    if "days" in kwargs and kwargs["days"] > 0 and "expire_at" not in kwargs and not fields.get("expire_after_first_use_seconds"):
         fields["expire_at"] = (datetime.now(timezone.utc) + timedelta(days=int(kwargs["days"]))).isoformat()
     if not fields:
         return
@@ -277,3 +280,10 @@ def get_overview_stats():
         nodes = c.execute("SELECT COUNT(*) FROM nodes WHERE enabled=1").fetchone()[0]
         recent = c.execute("SELECT sub_id, accessed_at FROM access_logs ORDER BY accessed_at DESC LIMIT 10").fetchall()
         return {"total_subs": total, "active_subs": active, "nodes": nodes, "recent": [dict(r) for r in recent]}
+
+def get_subs_pending_first_use_expiry():
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM subscriptions WHERE expire_after_first_use_seconds > 0 AND expire_at IS NULL"
+        ).fetchall()
+        return [dict(r) for r in rows]

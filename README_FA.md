@@ -80,9 +80,9 @@ sudo ./install.sh
 |---|---|---|
 | `GET` | `/api/subscriptions` | لیست اشتراک‌ها. پارامترها: `page`، `per_page` (0 = همه)، `search` |
 | `GET` | `/api/subscriptions/stream` | SSE stream — فقط اشتراک‌های تغییرکرده/حذف‌شده هر ۵ ثانیه |
-| `POST` | `/api/subscriptions` | ایجاد اشتراک و افزودن به نودها |
+| `POST` | `/api/subscriptions` | ایجاد اشتراک و افزودن به نودها. Body: `comment`، `data_gb`، `days`، `ip_limit`، `node_ids`، `show_multiplier`، `expire_after_first_use_seconds` |
 | `GET` | `/api/subscriptions/<id>` | دریافت اشتراک همراه با لیست نودها |
-| `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit`، `enabled`، `remove_days`، `remove_expiry`، `remove_data_limit` (برای حذف محدودیت داده `true` بدهید) |
+| `PUT` | `/api/subscriptions/<id>` | ویرایش فیلدها: `comment`، `data_gb`، `days`، `ip_limit`، `enabled`، `show_multiplier`، `expire_after_first_use_seconds`، `remove_days`، `remove_expiry`، `remove_data_limit` |
 | `DELETE` | `/api/subscriptions/<id>` | حذف اشتراک و حذف کلاینت از تمام نودها |
 | `GET` | `/api/subscriptions/<id>/stats` | دریافت آمار ترافیک |
 | `GET` | `/api/subscriptions/<id>/qr` | تصویر PNG کد QR برای لینک اشتراک |

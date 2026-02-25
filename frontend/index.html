@@ -96,12 +96,12 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .search-wrap input:focus{outline:none;border-color:var(--border2)}
 .search-wrap input::placeholder{color:var(--text3)}
 .search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;width:15px;height:15px}
-.btn{padding:8px 16px;border-radius:var(--radius-sm);border:none;font-size:0.84em;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn{padding:10px 20px;border-radius:var(--radius);border:none;font-size:0.85em;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.2s}
 .btn-accent{background:var(--accent);color:#0d1117}
 .btn-accent:hover{background:#00cc8e;box-shadow:0 0 18px var(--accent-glow)}
 .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
-.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
-.btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(239,68,68,0.2);padding:6px 11px;font-size:0.8em}
+.btn-ghost:hover{color:#fff;border-color:var(--text)}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(239,68,68,0.3)}
 .btn-danger:hover{background:var(--danger-dim)}
 .btn-icon{background:transparent;color:var(--text2);border:1px solid var(--border);padding:6px 8px}
 .btn-icon:hover{color:var(--accent);border-color:var(--accent-border)}
@@ -429,6 +429,7 @@ Refresh
 <div class="fg"><label class="fl">Update Check Interval (seconds)</label><input class="fi" id="cfg-update-interval" type="number" placeholder="300"></div>
 <div class="fg"><label class="fl">Data Label (subscription page)</label><input class="fi" id="cfg-data-label" placeholder="⬇️ Data left"></div>
 <div class="fg"><label class="fl">Expire Label (subscription page)</label><input class="fi" id="cfg-expire-label" placeholder="⏰ Expires"></div>
+<div class="fg"><label class="fl">Profile Title (header)</label><input class="fi" id="cfg-profile-title" placeholder="GhostGate Subscription"></div>
 <div class="fg"><label class="fl">Panel Worker Threads</label><input class="fi" id="cfg-threads" type="number" placeholder="8"></div>
 <div class="fg"><label class="fl">Log File</label><input class="fi" id="cfg-log" placeholder="/var/log/ghostgate.log"></div>
 <div class="fg"><label class="fl">Update Proxy (optional)</label><input class="fi" id="cfg-update-proxy" placeholder="http://proxy:3128"></div>
@@ -470,6 +471,7 @@ Refresh
 <div class="fg"><label class="fl">Data Limit (GB, 0=∞)</label><input class="fi" id="mc-data" type="number" value="0" min="0" step="0.1"></div>
 <div class="fg"><label class="fl">Validity (days, 0=∞)</label><input class="fi" id="mc-days" type="number" value="30" min="0"></div>
 </div>
+<div class="fg" style="margin-top:-6px"><label class="fl" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="mc-firstuse" style="accent-color:var(--accent)">Start expiry after first use</label></div>
 <div class="fg"><label class="fl">IP Limit (0=∞)</label><input class="fi" id="mc-ip" type="number" value="0" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="mc-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
 <div class="fg"><label class="fl">Nodes</label><div class="nodes-list" id="mc-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading nodes...</div></div></div>
@@ -491,6 +493,7 @@ Refresh
 <div class="fg"><label class="fl">Data Limit (GB)</label><input class="fi" id="me-data" type="number" min="0" step="0.1"></div>
 <div class="fg"><label class="fl">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0"></div>
 </div>
+<div class="fg" style="margin-top:-6px"><label class="fl" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="me-firstuse" style="accent-color:var(--accent)">Start expiry after first use</label></div>
 <div style="display:flex;gap:8px"><button id="me-no-expire-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoExpire()">Set No Expiry</button><button id="me-no-limit-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoDataLimit()">Set No Data Limit</button></div>
 <div class="fg"><label class="fl">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="me-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
@@ -574,7 +577,7 @@ function setG(fid,tid,pct){
   const f=document.getElementById(fid);
   const fill=Math.min(pct,100)/100*arc;
   f.setAttribute("stroke-dasharray",fill+" "+(circ-fill));
-  f.setAttribute("stroke",pct>85?"#ef4444":pct>65?"#f59e0b":"#00e5a0");
+  f.setAttribute("stroke",pct>85?"#ef4444":pct>60?"#f59e0b":"var(--accent)");
   document.getElementById(tid).textContent=pct.toFixed(1)+"%";
 }
 
@@ -619,6 +622,8 @@ evt.onmessage=function(e){
     document.getElementById("st-total").textContent=d.total_subs;
     document.getElementById("st-active").textContent=d.active_subs;
     document.getElementById("st-nodes").textContent=d.nodes;
+    const activePct=d.total_subs?Math.round(d.active_subs*100/d.total_subs):0;
+    document.getElementById("st-active").style.color=activePct<=60?"#ef4444":activePct<=85?"#f59e0b":"#00e5a0";
     if(document.getElementById("ss-total")) document.getElementById("ss-total").textContent=d.total_subs;
     if(document.getElementById("ss-active")) document.getElementById("ss-active").textContent=d.active_subs;
     if(document.getElementById("ss-nodes")) document.getElementById("ss-nodes").textContent=d.nodes;
@@ -659,7 +664,8 @@ function renderSubRow(sub){
   const isOver=limitB>0&&usedB>=limitB;
   const isDisabled=sub.enabled===0||sub.enabled===false;
   const statusBadge=isDisabled?'<span class="badge badge-muted">Disabled</span>':isExp||isOver?`<span class="badge badge-red">${isExp?"Expired":"Over Limit"}</span>`:'<span class="badge badge-green">Active</span>';
-  const nodes=(sub.node_names||[]).map(n=>`<span class="badge badge-muted" style="font-size:0.72em">${n}</span>`).join(" ")||'<span style="color:var(--text3);font-size:0.8em">—</span>';
+  const nn=(sub.node_names||[]);
+  const nodes=nn.length?`<span class="badge badge-muted" style="font-size:0.72em" title="${nn.join(", ")}">${nn.length} node${nn.length>1?"s":""}</span>`:'<span style="color:var(--text3);font-size:0.8em">—</span>';
   const progCls=pct>85?" d":pct>65?" w":"";
   const exactUsed=usedB.toLocaleString()+" bytes ("+((usedB/1073741824).toFixed(4))+" GB)";
   const exactLimit=limitB>0?limitB.toLocaleString()+" bytes ("+sub.data_gb+" GB)":"Unlimited";
@@ -713,6 +719,7 @@ async function openCreate(){
   document.getElementById("mc-comment").value="";
   document.getElementById("mc-data").value="0";
   document.getElementById("mc-days").value="30";
+  document.getElementById("mc-firstuse").checked=false;
   document.getElementById("mc-ip").value="0";
   document.getElementById("mc-submit").textContent="Create";
   document.getElementById("mc-sm").value="1";
@@ -727,13 +734,14 @@ async function submitCreate(){
   const comment=document.getElementById("mc-comment").value.trim();
   const data_gb=parseFloat(document.getElementById("mc-data").value)||0;
   const days=parseInt(document.getElementById("mc-days").value)||0;
+  const expire_after_first_use_seconds=document.getElementById("mc-firstuse").checked?Math.max(0,days*86400):0;
   const ip_limit=parseInt(document.getElementById("mc-ip").value)||0;
   const node_ids=[...document.querySelectorAll("#mc-nodes input:checked")].map(x=>parseInt(x.value));
   const show_multiplier=parseInt(document.getElementById("mc-sm").value)||1;
   const btn=document.getElementById("mc-submit");
   btn.disabled=true; btn.textContent="Creating…";
   try{
-    const r=await fetch(API+"/api/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment,data_gb,days,ip_limit,node_ids,show_multiplier})}).then(x=>x.json());
+    const r=await fetch(API+"/api/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment,data_gb,days,ip_limit,node_ids,show_multiplier,expire_after_first_use_seconds})}).then(x=>x.json());
     if(r.errors&&r.errors.length>0) showAlert("mc-alert","Created (with errors): "+r.errors.join("; "),"err");
     else { closeM("m-create"); loadSubs(); showAlert("s-alert","Subscription created: "+r.id,"ok"); }
   }catch(ex){ showAlert("mc-alert","Error: "+ex,"err"); }
@@ -786,6 +794,7 @@ async function editSub(id){
   document.getElementById("me-data").value=sub.data_gb||0;
   document.getElementById("me-days").value=0; document.getElementById("me-days").disabled=false; _removeExpiry=false; document.getElementById("me-no-expire-btn").textContent="Set No Expiry"; document.getElementById("me-no-expire-btn").style.color="";
   document.getElementById("me-data").disabled=false; _removeDataLimit=false; document.getElementById("me-no-limit-btn").textContent="Set No Data Limit"; document.getElementById("me-no-limit-btn").style.color="";
+  document.getElementById("me-firstuse").checked=(parseInt(sub.expire_after_first_use_seconds)||0)>0;
   document.getElementById("me-ip").value=sub.ip_limit||0;
   document.getElementById("me-sm").value=sub.show_multiplier||1;
   const assignedIds=new Set((sub.nodes||[]).map(n=>n.node_id));
@@ -801,6 +810,7 @@ async function submitEdit(){
   if(!editingSubId) return;
   const body={comment:document.getElementById("me-comment").value.trim(),data_gb:_removeDataLimit?0:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
   if(_removeExpiry){ body.remove_expiry=true; } else { const days=parseInt(document.getElementById("me-days").value)||0; if(days>0) body.days=days; else if(days<0) body.remove_days=-days; }
+  if(document.getElementById("me-firstuse").checked){ const d=parseInt(body.days||0)||0; body.expire_after_first_use_seconds=Math.max(0,d*86400); } else { body.expire_after_first_use_seconds=0; }
   const checked=new Set([...document.querySelectorAll("#me-nodes input:checked")].map(i=>parseInt(i.value)));
   const toAdd=[...checked].filter(id=>!editingOrigNodes.has(id));
   const toRemove=[...editingOrigNodes].filter(id=>!checked.has(id));
@@ -999,6 +1009,7 @@ async function loadSettings(){
   document.getElementById("cfg-update-interval").value=s.UPDATE_CHECK_INTERVAL||"300";
   document.getElementById("cfg-data-label").value=s.DATA_LABEL||"";
   document.getElementById("cfg-expire-label").value=s.EXPIRE_LABEL||"";
+  document.getElementById("cfg-profile-title").value=s.PROFILE_TITLE||"GhostGate Subscription";
   document.getElementById("cfg-threads").value=s.PANEL_THREADS||"8";
   document.getElementById("cfg-log").value=s.LOG_FILE||"";
   document.getElementById("cfg-token").value=s.BOT_TOKEN||"";
@@ -1016,6 +1027,7 @@ async function saveSettings(){
     UPDATE_CHECK_INTERVAL:document.getElementById("cfg-update-interval").value.trim(),
     DATA_LABEL:document.getElementById("cfg-data-label").value.trim(),
     EXPIRE_LABEL:document.getElementById("cfg-expire-label").value.trim(),
+    PROFILE_TITLE:document.getElementById("cfg-profile-title").value.trim(),
     PANEL_THREADS:document.getElementById("cfg-threads").value.trim(),
     LOG_FILE:document.getElementById("cfg-log").value.trim(),
     BOT_TOKEN:document.getElementById("cfg-token").value.trim(),

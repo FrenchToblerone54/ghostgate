@@ -59,10 +59,10 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text(
         "GhostGate Bot\n\n"
-        "/create [--comment X] [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none]\n"
+        "/create [--comment X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none]\n"
         "/delete <id or comment>\n"
         "/stats <id or comment>\n"
-        "/edit <id or comment> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]\n"
+        "/edit <id or comment> [--comment X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]\n"
         "/list [page] — 10 per page\n"
         "/nodes\n"
         "/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...] [--multiplier N]\n"
@@ -80,6 +80,9 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     comment = opts.get("comment")
     data_gb = float(opts.get("data", 0))
     days = int(opts.get("days", 0))
+    firstuse_days = int(opts.get("firstuse-days", 0))
+    firstuse_seconds = int(opts.get("firstuse-seconds", opts.get("firstuse", 0)))
+    expire_after_first_use_seconds = max(0, firstuse_seconds or (firstuse_days * 86400))
     ip_limit = int(opts.get("ip", 0))
     show_multiplier = max(1, int(opts.get("show-multiplier", 1)))
     nodes_str = opts.get("nodes", "all")
@@ -93,7 +96,7 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         node_ids = []
     else:
         node_ids = [int(x.strip()) for x in nodes_str.split(",") if x.strip().isdigit()]
-    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier)
+    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, expire_after_first_use_seconds=expire_after_first_use_seconds)
     sub = db.get_sub(sub_id)
     client_uuid = str(uuid.uuid4())
     expire_ms = 0
@@ -102,6 +105,7 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
         except Exception:
             pass
+    expiry_time = -expire_after_first_use_seconds if expire_after_first_use_seconds>0 and not sub.get("expire_at") else expire_ms
     added_nodes = []
     for node_id in node_ids:
         node = db.get_node(node_id)
@@ -111,7 +115,7 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
             total_limit_bytes = int(data_gb * 1073741824 / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
             email = f"{sub_id}-{node_id}"
-            client = xui.make_client(email, client_uuid, expire_ms, ip_limit, sub_id, comment or "", total_limit_bytes)
+            client = xui.make_client(email, client_uuid, expiry_time, ip_limit, sub_id, comment or "", total_limit_bytes)
             if xui.add_client(node["inbound_id"], client):
                 db.add_sub_node(sub_id, node_id, client_uuid, email)
                 added_nodes.append(node["name"])
@@ -231,6 +235,13 @@ async def cmd_edit(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         updates["data_gb"] = float(opts["data"])
     if "days" in opts:
         updates["days"] = int(opts["days"])
+    if "firstuse-days" in opts or "firstuse-seconds" in opts or "firstuse" in opts:
+        firstuse_days = int(opts.get("firstuse-days", 0))
+        firstuse_seconds = int(opts.get("firstuse-seconds", opts.get("firstuse", 0)))
+        updates["expire_after_first_use_seconds"] = max(0, firstuse_seconds or (firstuse_days * 86400))
+        updates["expire_at"] = None
+    if "no-firstuse" in opts:
+        updates["expire_after_first_use_seconds"] = 0
     if "ip" in opts:
         updates["ip_limit"] = int(opts["ip"])
     if "show-multiplier" in opts:
@@ -351,7 +362,19 @@ async def _run_once():
     async with app:
         await app.start()
         await app.updater.start_polling(drop_pending_updates=True)
-        await asyncio.sleep(float("inf"))
+        async def _watchdog():
+            fails = 0
+            while True:
+                await asyncio.sleep(30)
+                try:
+                    await asyncio.wait_for(app.bot.get_me(), timeout=10)
+                    fails = 0
+                except Exception as e:
+                    fails += 1
+                    logger.warning(f"bot watchdog failed ({fails}/3): {e}")
+                    if fails >= 3:
+                        raise RuntimeError("bot watchdog restart")
+        await asyncio.gather(asyncio.sleep(float("inf")), _watchdog())
 
 def start():
     while True:

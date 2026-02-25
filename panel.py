@@ -193,9 +193,10 @@ def sub_page(sub_id):
                 configs.append(_fmt_vless(sn["client_uuid"], sn["name"], orig_server, orig_port, stream, orig_security))
         except Exception:
             pass
+    profile_title = os.getenv("PROFILE_TITLE", "GhostGate Subscription")
     headers = {
         "Content-Type": "text/plain; charset=utf-8",
-        "Profile-Title": base64.b64encode((sub.get("comment") or "GhostGate").encode()).decode(),
+        "Profile-Title": base64.b64encode(profile_title.encode()).decode(),
         "subscription-userinfo": f"upload=0;download={total_bytes*sm};total={limit_bytes*sm if limit_bytes else 0};expire={expire_ts}",
         "profile-update-interval": "1",
         "Content-Disposition": "attachment; filename=ghostgate",
@@ -269,14 +270,14 @@ def register_routes(panel_path):
                             yield f"data: {json.dumps({'type': 'delete', 'id': sid})}\n\n"
                             changed = True
                         for sid, sub in curr.items():
-                            h = json.dumps({k: sub.get(k) for k in ["used_bytes", "expire_at", "enabled", "data_gb", "comment", "node_names", "ip_limit"]}, sort_keys=True)
+                            h = json.dumps({k: sub.get(k) for k in ["used_bytes", "expire_at", "enabled", "data_gb", "comment", "node_names", "ip_limit", "expire_after_first_use_seconds"]}, sort_keys=True)
                             if prev.get(sid) != h:
                                 yield f"data: {json.dumps({'type': 'update', 'sub': sub})}\n\n"
                                 changed = True
                         if not changed:
                             yield ": heartbeat\n\n"
                     first = False
-                    prev = {sid: json.dumps({k: curr[sid].get(k) for k in ["used_bytes", "expire_at", "enabled", "data_gb", "comment", "node_names", "ip_limit"]}, sort_keys=True) for sid in curr}
+                    prev = {sid: json.dumps({k: curr[sid].get(k) for k in ["used_bytes", "expire_at", "enabled", "data_gb", "comment", "node_names", "ip_limit", "expire_after_first_use_seconds"]}, sort_keys=True) for sid in curr}
                 except Exception:
                     pass
                 time.sleep(5)
@@ -291,8 +292,9 @@ def register_routes(panel_path):
         days = int(data.get("days", 0))
         ip_limit = int(data.get("ip_limit", 0))
         show_multiplier = max(1, int(data.get("show_multiplier", 1)))
+        expire_after_first_use_seconds = int(data.get("expire_after_first_use_seconds", 0))
         node_ids = [int(n) for n in data.get("node_ids", [])]
-        sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier)
+        sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, expire_after_first_use_seconds=expire_after_first_use_seconds)
         sub = db.get_sub(sub_id)
         client_uuid = str(uuid.uuid4())
         expire_ms = 0
@@ -301,6 +303,8 @@ def register_routes(panel_path):
                 expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
             except Exception:
                 pass
+        expire_after = int(sub.get("expire_after_first_use_seconds") or 0)
+        expiry_time = -expire_after if expire_after>0 and not sub.get("expire_at") else expire_ms
         errors = []
         for node_id in node_ids:
             node = db.get_node(node_id)
@@ -310,7 +314,8 @@ def register_routes(panel_path):
                 xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
                 total_limit_bytes = int(max(0, data_gb * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
                 email = f"{sub_id}-{node_id}"
-                client = xui.make_client(email, client_uuid, expire_ms, ip_limit, sub_id, comment or "", total_limit_bytes)
+                expiry_time = -expire_after_first_use_seconds if expire_after_first_use_seconds>0 else expire_ms
+                client = xui.make_client(email, client_uuid, expiry_time, ip_limit, sub_id, comment or "", total_limit_bytes)
                 ok = xui.add_client(node["inbound_id"], client)
                 if ok:
                     db.add_sub_node(sub_id, node_id, client_uuid, email)
@@ -332,8 +337,10 @@ def register_routes(panel_path):
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>", methods=["PUT"])
     def api_sub_update(sub_id):
         body = request.json
-        updates = {k: body[k] for k in ["comment", "data_gb", "days", "ip_limit", "enabled", "show_multiplier"] if k in body}
+        updates = {k: body[k] for k in ["comment", "data_gb", "days", "ip_limit", "enabled", "show_multiplier", "expire_after_first_use_seconds"] if k in body}
         if body.get("remove_expiry"):
+            updates["expire_at"] = None
+        if "expire_after_first_use_seconds" in updates and int(updates.get("expire_after_first_use_seconds") or 0)>0:
             updates["expire_at"] = None
         elif "remove_days" in body and int(body["remove_days"]) > 0:
             sub = db.get_sub(sub_id)
@@ -358,18 +365,20 @@ def register_routes(panel_path):
                     xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], enabled_val)
                 except Exception:
                     pass
-        if any(k in updates for k in ("expire_at", "days", "ip_limit")) or body.get("remove_expiry") or "remove_days" in body:
+        if any(k in updates for k in ("expire_at", "days", "ip_limit", "expire_after_first_use_seconds")) or body.get("remove_expiry") or "remove_days" in body:
             expire_ms = 0
             if sub and sub.get("expire_at"):
                 try:
                     expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
                 except Exception:
                     pass
+            expire_after = int(sub.get("expire_after_first_use_seconds") or 0) if sub else 0
+            expiry_time = -expire_after if expire_after>0 and not (sub and sub.get("expire_at")) else expire_ms
             ip_limit = sub.get("ip_limit", 0) if sub else 0
             for sn in snodes:
                 try:
                     xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
-                    xui.update_client_expiry_ip(sn["inbound_id"], sn["client_uuid"], sn["email"], expire_ms, ip_limit)
+                    xui.update_client_expiry_ip(sn["inbound_id"], sn["client_uuid"], sn["email"], expiry_time, ip_limit)
                 except Exception:
                     pass
         return jsonify({"ok": True})
@@ -399,6 +408,8 @@ def register_routes(panel_path):
                 expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
             except Exception:
                 pass
+        expire_after = int(sub.get("expire_after_first_use_seconds") or 0)
+        expiry_time = -expire_after if expire_after>0 and not sub.get("expire_at") else expire_ms
         errors = []
         for node_id in node_ids:
             if node_id in existing:
@@ -411,7 +422,7 @@ def register_routes(panel_path):
                 xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
                 total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
                 email = f"{sub_id}-{node_id}"
-                client = xui.make_client(email, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
+                client = xui.make_client(email, client_uuid, expiry_time, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
                 ok = xui.add_client(node["inbound_id"], client)
                 if ok:
                     db.add_sub_node(sub_id, node_id, client_uuid, email)
@@ -453,6 +464,8 @@ def register_routes(panel_path):
                         expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
                     except Exception:
                         pass
+                expire_after = int(sub.get("expire_after_first_use_seconds") or 0)
+                expiry_time = -expire_after if expire_after>0 and not sub.get("expire_at") else expire_ms
                 for node_id in node_ids:
                     if node_id in existing:
                         continue
@@ -464,7 +477,7 @@ def register_routes(panel_path):
                         xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
                         total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
                         email = f"{sub_id}-{node_id}"
-                        client = xui.make_client(email, client_uuid, expire_ms, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
+                        client = xui.make_client(email, client_uuid, expiry_time, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
                         ok = xui.add_client(node["inbound_id"], client)
                         if ok:
                             db.add_sub_node(sub_id, node_id, client_uuid, email)
@@ -642,7 +655,18 @@ def register_routes(panel_path):
 
     @app.route(f"/{panel_path}/api/update", methods=["POST"])
     def api_update_apply():
-        threading.Thread(target=updater.apply_update, daemon=True).start()
+        def _do():
+            try:
+                ok = updater.apply_update()
+                if ok:
+                    try:
+                        subprocess.Popen(["systemctl", "restart", "ghostgate"])
+                    except Exception:
+                        time.sleep(1)
+                        os.execv(sys.executable, [sys.executable] + sys.argv)
+            except Exception:
+                pass
+        threading.Thread(target=_do, daemon=True).start()
         return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/settings")

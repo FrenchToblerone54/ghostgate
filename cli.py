@@ -216,6 +216,9 @@ def cmd_create(args):
     comment = opts.get("comment", "")
     data_gb = float(opts.get("data", opts.get("data-gb", 0)))
     days = int(opts.get("days", 0))
+    firstuse_days = int(opts.get("firstuse-days", 0))
+    firstuse_seconds = int(opts.get("firstuse-seconds", opts.get("firstuse", 0)))
+    expire_after_first_use_seconds = max(0, firstuse_seconds or (firstuse_days * 86400))
     ip_limit = int(opts.get("ip", 0))
     show_multiplier = max(1, int(opts.get("show-multiplier", 1)))
     node_ids_raw = opts.get("nodes", "")
@@ -230,13 +233,14 @@ def cmd_create(args):
     if custom_id and db.get_sub(custom_id):
         console.print(f"[{DANGER}]ID already exists: {custom_id}[/]")
         return
-    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, sub_id=custom_id)
+    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, sub_id=custom_id, expire_after_first_use_seconds=expire_after_first_use_seconds)
     sub = db.get_sub(sub_id)
     client_uuid = str(uuid.uuid4())
     expire_ms = 0
     if sub.get("expire_at"):
         try: expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp()*1000)
         except Exception: pass
+    expiry_time = -expire_after_first_use_seconds if expire_after_first_use_seconds>0 and not sub.get("expire_at") else expire_ms
     errors = []
     for node_id in node_ids:
         node = db.get_node(node_id)
@@ -245,7 +249,7 @@ def cmd_create(args):
             xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
             total_limit_bytes = int(data_gb * 1073741824 / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
             email = f"{sub_id}-{node_id}"
-            client = xui.make_client(email, client_uuid, expire_ms, ip_limit, sub_id, comment, total_limit_bytes)
+            client = xui.make_client(email, client_uuid, expiry_time, ip_limit, sub_id, comment, total_limit_bytes)
             ok = xui.add_client(node["inbound_id"], client)
             if ok: db.add_sub_node(sub_id, node_id, client_uuid, email)
             else: errors.append(f"node {node_id}: failed")
@@ -290,7 +294,7 @@ def cmd_edit(args):
     from xui_client import XUIClient
     pos = [a for a in args if not a.startswith("--")]
     if not pos:
-        console.print(f"[{DANGER}]Usage: ghostgate edit <id or comment> [--data GB] [--days N] [--comment X] [--ip N][/]")
+        console.print(f"[{DANGER}]Usage: ghostgate edit <id or comment> [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--comment X] [--ip N][/]")
         return
     key = pos[0]
     sub = db.get_sub(key) or db.get_sub_by_comment(key)
@@ -302,6 +306,12 @@ def cmd_edit(args):
     if "comment" in opts: updates["comment"] = opts["comment"]
     if "data" in opts: updates["data_gb"] = float(opts["data"])
     if "days" in opts: updates["days"] = int(opts["days"])
+    if "firstuse-days" in opts or "firstuse-seconds" in opts or "firstuse" in opts:
+        firstuse_days = int(opts.get("firstuse-days", 0))
+        firstuse_seconds = int(opts.get("firstuse-seconds", opts.get("firstuse", 0)))
+        updates["expire_after_first_use_seconds"] = max(0, firstuse_seconds or (firstuse_days * 86400))
+        updates["expire_at"] = None
+    if "no-firstuse" in opts: updates["expire_after_first_use_seconds"] = 0
     if "ip" in opts: updates["ip_limit"] = int(opts["ip"])
     if "enable" in opts: updates["enabled"] = 1
     if "disable" in opts: updates["enabled"] = 0
@@ -353,8 +363,8 @@ def cmd_help(args):
     lines = [
         f"  [{ACC}]list[/] [{MUTED}][--search X][/]                          List all subscriptions",
         f"  [{ACC}]stats[/] [{MUTED}]<id|comment>[/]                         Show detailed subscription info",
-        f"  [{ACC}]create[/] [{MUTED}][--id X] --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none][/]",
-        f"  [{ACC}]edit[/] [{MUTED}]<id|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable][/]",
+        f"  [{ACC}]create[/] [{MUTED}][--id X] --comment X [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none][/]", 
+        f"  [{ACC}]edit[/] [{MUTED}]<id|comment> [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable][/]", 
         f"  [{ACC}]delete[/] [{MUTED}]<id|comment>[/]                         Delete subscription",
         f"  [{ACC}]nodes[/]                                       List nodes",
         f"  [{ACC}]status[/]                                      System overview",
