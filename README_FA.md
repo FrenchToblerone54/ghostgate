@@ -31,7 +31,7 @@
 ## شروع سریع
 
 ```bash
-wget https://github.com/frenchtoblerone54/ghostgate/releases/latest/download/install.sh -O install.sh
+wget https://raw.githubusercontent.com/frenchtoblerone54/ghostgate/main/scripts/install.sh -O install.sh
 chmod +x install.sh
 sudo ./install.sh
 ```
