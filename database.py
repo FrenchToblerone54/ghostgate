@@ -18,7 +18,7 @@ def _conn():
     finally:
         c.close()
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 def init_db():
     with _conn() as c:
@@ -127,9 +127,11 @@ CREATE INDEX IF NOT EXISTS idx_al_sub ON access_logs(sub_id);
                 c.execute("ALTER TABLE nodes ADD COLUMN traffic_multiplier REAL DEFAULT 1.0")
             if not _col_exists("subscription_nodes", "client_disabled"):
                 c.execute("ALTER TABLE subscription_nodes ADD COLUMN client_disabled INTEGER DEFAULT 0")
+            c.execute("PRAGMA user_version=1")
+        if user_ver < 2:
             if not _col_exists("subscriptions", "expire_after_first_use_seconds"):
                 c.execute("ALTER TABLE subscriptions ADD COLUMN expire_after_first_use_seconds INTEGER DEFAULT 0")
-            c.execute("PRAGMA user_version=1")
+            c.execute("PRAGMA user_version=2")
 
 def add_node(name, address, username, password, inbound_id, proxy_url=None, traffic_multiplier=1.0):
     with _conn() as c:
