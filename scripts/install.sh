@@ -47,6 +47,8 @@ if [ ! -f /opt/ghostgate/.env ]; then
 
     read -p "Base URL (e.g. https://your-domain.com): " BASE_URL
     BASE_URL=${BASE_URL:-"http://localhost:5000"}
+    BASE_URL="${BASE_URL#\"}"; BASE_URL="${BASE_URL%\"}"; BASE_URL="${BASE_URL#\'}"; BASE_URL="${BASE_URL%\'}"
+    BASE_URL=${BASE_URL%/}
 
     echo ""
     echo "Telegram Bot Setup"
@@ -110,6 +112,12 @@ else
     PORT=$(grep "^PORT=" /opt/ghostgate/.env | cut -d'=' -f2)
     PANEL_PATH=$(grep "^PANEL_PATH=" /opt/ghostgate/.env | cut -d'=' -f2)
     BASE_URL=$(grep "^BASE_URL=" /opt/ghostgate/.env | cut -d'=' -f2)
+    HOST="${HOST#\"}"; HOST="${HOST%\"}"; HOST="${HOST#\'}"; HOST="${HOST%\'}"
+    PORT="${PORT#\"}"; PORT="${PORT%\"}"; PORT="${PORT#\'}"; PORT="${PORT%\'}"
+    PANEL_PATH="${PANEL_PATH#\"}"; PANEL_PATH="${PANEL_PATH%\"}"; PANEL_PATH="${PANEL_PATH#\'}"; PANEL_PATH="${PANEL_PATH%\'}"
+    BASE_URL="${BASE_URL#\"}"; BASE_URL="${BASE_URL%\"}"; BASE_URL="${BASE_URL#\'}"; BASE_URL="${BASE_URL%\'}"
+    BASE_URL=${BASE_URL%/}
+    PANEL_PATH=${PANEL_PATH#/}; PANEL_PATH=${PANEL_PATH%/}
     HOST=${HOST:-127.0.0.1}
     PORT=${PORT:-5000}
 fi
@@ -218,7 +226,7 @@ echo "║               GhostGate Installation Complete            ║"
 echo "╠══════════════════════════════════════════════════════════╣"
 echo "║                                                          ║"
 echo "║  Panel URL:                                              ║"
-echo "║  ${BASE_URL}/${PANEL_PATH}/                               "
+echo "║  ${BASE_URL}/${PANEL_PATH}/                               ║"
 echo "║                                                          ║"
 echo "║  ⚠  Save this URL! It is your admin panel access path.  ║"
 echo "║                                                          ║"
