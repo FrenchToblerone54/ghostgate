@@ -18,10 +18,17 @@ def _conn():
     finally:
         c.close()
 
+SCHEMA_VERSION = 1
+
 def init_db():
     with _conn() as c:
-        c.executescript("""
-CREATE TABLE IF NOT EXISTS nodes (
+        user_ver = int(c.execute("PRAGMA user_version").fetchone()[0] or 0)
+        has_tables = c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name IN ('nodes','subscriptions','subscription_nodes','access_logs') LIMIT 1").fetchone() is not None
+        def _col_exists(table, col):
+            return any(r[1] == col for r in c.execute(f"PRAGMA table_info({table})").fetchall())
+        if user_ver == 0 and not has_tables:
+            c.executescript("""
+CREATE TABLE nodes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     address TEXT NOT NULL,
@@ -33,7 +40,7 @@ CREATE TABLE IF NOT EXISTS nodes (
     enabled INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS subscriptions (
+CREATE TABLE subscriptions (
     id TEXT PRIMARY KEY,
     comment TEXT,
     data_gb REAL DEFAULT 0,
@@ -45,7 +52,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     show_multiplier INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS subscription_nodes (
+CREATE TABLE subscription_nodes (
     sub_id TEXT NOT NULL,
     node_id INTEGER NOT NULL,
     client_uuid TEXT NOT NULL,
@@ -55,7 +62,7 @@ CREATE TABLE IF NOT EXISTS subscription_nodes (
     FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
     FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
 );
-CREATE TABLE IF NOT EXISTS access_logs (
+CREATE TABLE access_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sub_id TEXT NOT NULL,
     ip_address TEXT,
@@ -63,32 +70,63 @@ CREATE TABLE IF NOT EXISTS access_logs (
     accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE
 );
+CREATE INDEX idx_al_sub ON access_logs(sub_id);
+            """)
+            c.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+            return
+        c.executescript("""
+CREATE TABLE IF NOT EXISTS nodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    username TEXT NOT NULL,
+    password TEXT NOT NULL,
+    inbound_id INTEGER NOT NULL,
+    proxy_url TEXT,
+    enabled INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id TEXT PRIMARY KEY,
+    comment TEXT,
+    data_gb REAL DEFAULT 0,
+    days INTEGER DEFAULT 0,
+    ip_limit INTEGER DEFAULT 0,
+    used_bytes INTEGER DEFAULT 0,
+    expire_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS subscription_nodes (
+    sub_id TEXT NOT NULL,
+    node_id INTEGER NOT NULL,
+    client_uuid TEXT NOT NULL,
+    email TEXT NOT NULL,
+    PRIMARY KEY (sub_id, node_id),
+    FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
+    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS access_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sub_id TEXT NOT NULL,
+    accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+);
 CREATE INDEX IF NOT EXISTS idx_al_sub ON access_logs(sub_id);
         """)
-        try:
-            c.execute("ALTER TABLE subscriptions ADD COLUMN enabled INTEGER DEFAULT 1")
-        except Exception:
-            pass
-        try:
-            c.execute("ALTER TABLE access_logs ADD COLUMN ip_address TEXT")
-        except Exception:
-            pass
-        try:
-            c.execute("ALTER TABLE access_logs ADD COLUMN user_agent TEXT")
-        except Exception:
-            pass
-        try:
-            c.execute("ALTER TABLE subscriptions ADD COLUMN show_multiplier INTEGER DEFAULT 1")
-        except Exception:
-            pass
-        try:
-            c.execute("ALTER TABLE nodes ADD COLUMN traffic_multiplier REAL DEFAULT 1.0")
-        except Exception:
-            pass
-        try:
-            c.execute("ALTER TABLE subscription_nodes ADD COLUMN client_disabled INTEGER DEFAULT 0")
-        except Exception:
-            pass
+        if user_ver < 1:
+            if not _col_exists("subscriptions", "enabled"):
+                c.execute("ALTER TABLE subscriptions ADD COLUMN enabled INTEGER DEFAULT 1")
+            if not _col_exists("subscriptions", "show_multiplier"):
+                c.execute("ALTER TABLE subscriptions ADD COLUMN show_multiplier INTEGER DEFAULT 1")
+            if not _col_exists("access_logs", "ip_address"):
+                c.execute("ALTER TABLE access_logs ADD COLUMN ip_address TEXT")
+            if not _col_exists("access_logs", "user_agent"):
+                c.execute("ALTER TABLE access_logs ADD COLUMN user_agent TEXT")
+            if not _col_exists("nodes", "traffic_multiplier"):
+                c.execute("ALTER TABLE nodes ADD COLUMN traffic_multiplier REAL DEFAULT 1.0")
+            if not _col_exists("subscription_nodes", "client_disabled"):
+                c.execute("ALTER TABLE subscription_nodes ADD COLUMN client_disabled INTEGER DEFAULT 0")
+            c.execute("PRAGMA user_version=1")
 
 def add_node(name, address, username, password, inbound_id, proxy_url=None, traffic_multiplier=1.0):
     with _conn() as c:
