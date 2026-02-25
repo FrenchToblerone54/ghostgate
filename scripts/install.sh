@@ -97,6 +97,7 @@ BOT_PROXY=${BOT_PROXY}
 UPDATE_PROXY=${UPDATE_PROXY}
 DATA_LABEL=
 EXPIRE_LABEL=
+PROFILE_TITLE=GhostGate Subscription
 PANEL_THREADS=${PANEL_THREADS}
 DB_PATH=/opt/ghostgate/ghostgate.db
 LOG_FILE=/var/log/ghostgate.log
