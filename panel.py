@@ -155,10 +155,12 @@ def sub_page(sub_id):
         base_dir = os.path.dirname(os.path.abspath(__file__))
         with open(os.path.join(base_dir, "frontend", "sub.html")) as f:
             tmpl = f.read()
+        sub_enabled = bool(sub.get("enabled", 1))
         return render_template_string(tmpl,
             sub_url=sub_url, qr_b64=qr_b64,
             data_used_str=data_used_str, data_total_str=data_total_str, data_percent=data_percent,
             expire_str=expire_str, is_expired=is_expired, is_over_limit=is_over_limit,
+            sub_enabled=sub_enabled,
             data_label=data_label, expire_label=expire_label
         )
     configs = [
@@ -605,6 +607,21 @@ def register_routes(panel_path):
     def api_node_delete(node_id):
         db.delete_node(node_id)
         return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/nodes/test", methods=["POST"])
+    def api_nodes_test():
+        data = request.json or {}
+        for k in ("address", "username", "password"):
+            if not data.get(k):
+                return jsonify({"ok": False, "error": f"missing {k}"}), 400
+        inbound_id = int(data.get("inbound_id") or 1)
+        try:
+            xui = XUIClient(data["address"], data["username"], data["password"], data.get("proxy_url"))
+            ok = xui.test_connection()
+            inbound = xui.get_inbound(inbound_id) if ok else None
+            return jsonify({"ok": ok, "protocol": inbound.get("protocol") if inbound else None})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)})
 
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>/test")
     def api_node_test(node_id):

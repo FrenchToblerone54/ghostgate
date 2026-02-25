@@ -32,6 +32,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 .brand-name{font-size:0.78em;font-weight:700;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase}
 .status-badge{padding:4px 12px;border-radius:20px;font-size:0.76em;font-weight:700;letter-spacing:0.3px}
 .status-active{background:rgba(0,229,160,0.12);color:var(--accent);border:1px solid rgba(0,229,160,0.25)}
+.status-inactive{background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid rgba(255,255,255,0.08)}
 .status-expired{background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.25)}
 .status-over{background:rgba(245,158,11,0.12);color:var(--warning);border:1px solid rgba(245,158,11,0.25)}
 .qr-section{padding:28px 22px 20px;display:flex;flex-direction:column;align-items:center;gap:14px}
@@ -70,7 +71,9 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-
 <div class="brand-icon"><div class="brand-pulse"></div></div>
 <span class="brand-name">GhostGate</span>
 </div>
-{% if is_expired %}
+{% if not sub_enabled %}
+<span class="status-badge status-inactive">Inactive</span>
+{% elif is_expired %}
 <span class="status-badge status-expired">Expired</span>
 {% elif is_over_limit %}
 <span class="status-badge status-over">Over Limit</span>

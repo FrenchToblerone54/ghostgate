@@ -956,10 +956,8 @@ async function submitNode(){
 }
 
 async function testNewNode(){
-  const body={name:"_test",address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,inbound_id:parseInt(document.getElementById("mn-inbound").value)||1,traffic_multiplier:1,proxy_url:document.getElementById("mn-proxy").value.trim()||null};
-  const r=await fetch(API+"/api/nodes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(x=>x.json());
-  const tr=await fetch(API+"/api/nodes/"+r.id+"/test").then(x=>x.json());
-  await fetch(API+"/api/nodes/"+r.id,{method:"DELETE"});
+  const body={address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,inbound_id:parseInt(document.getElementById("mn-inbound").value)||1,proxy_url:document.getElementById("mn-proxy").value.trim()||null};
+  const tr=await fetch(API+"/api/nodes/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(x=>x.json());
   showAlert("mn-alert",tr.ok?`Connected! Protocol: ${tr.protocol||"unknown"}`:`Failed: ${tr.error||"unreachable"}`,tr.ok?"ok":"err");
 }
 
