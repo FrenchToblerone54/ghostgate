@@ -72,9 +72,9 @@ The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the
 |---|---|---|
 | `GET` | `/api/subscriptions` | List subscriptions. Query params: `page`, `per_page` (0 = all), `search` |
 | `GET` | `/api/subscriptions/stream` | SSE stream — emits only changed/deleted subscriptions every 5s |
-| `POST` | `/api/subscriptions` | Create subscription and add to nodes |
+| `POST` | `/api/subscriptions` | Create subscription and add to nodes. Body: `comment`, `data_gb`, `days`, `ip_limit`, `node_ids`, `show_multiplier`, `expire_after_first_use_seconds` |
 | `GET` | `/api/subscriptions/<id>` | Get subscription with node list |
-| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled`, `remove_days`, `remove_expiry`, `remove_data_limit` (set `true` to clear data limit) |
+| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled`, `show_multiplier`, `expire_after_first_use_seconds`, `remove_days`, `remove_expiry`, `remove_data_limit` |
 | `DELETE` | `/api/subscriptions/<id>` | Delete subscription and remove clients from all nodes |
 | `GET` | `/api/subscriptions/<id>/stats` | Get traffic stats |
 | `GET` | `/api/subscriptions/<id>/qr` | QR code PNG for the subscription link |
