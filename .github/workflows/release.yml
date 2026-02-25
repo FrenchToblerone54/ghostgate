@@ -13,14 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - name: Ensure python3.13 alias
-        run: |
-          if ! command -v python3.13 >/dev/null 2>&1; then
-            sudo ln -sf "$(which python)" /usr/local/bin/python3.13
-          fi
       - name: Normalize version input
         id: ver
         run: |
@@ -34,13 +26,9 @@ jobs:
             echo "updater.py VERSION=$v does not match input version=${{ inputs.version }}"
             exit 1
           fi
-      - name: Install deps
+      - name: Build (Docker, Ubuntu 22.04)
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
-      - name: Build
-        run: |
-          bash build/build.sh
+          bash build/build-docker.sh
       - name: Create release
         uses: ncipollo/release-action@v1
         with:
