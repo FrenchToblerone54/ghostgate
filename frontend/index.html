@@ -50,17 +50,14 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .main-body{padding:22px 26px;max-width:1500px}
 .page{display:none}.page.active{display:block}
 .page-title{font-size:1.1em;font-weight:800;color:#fff;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
-.gauges{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
-.gauge-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;transition:border-color 0.2s}
-.gauge-card:hover{border-color:var(--border2)}
-.gauge-svg{width:100px;height:100px}
-.gauge-svg circle{fill:none;stroke-linecap:round}
-.gauge-track{stroke:rgba(255,255,255,0.06);stroke-width:6}
-.gauge-fill{stroke:var(--accent);stroke-width:6;transition:stroke-dasharray 0.9s cubic-bezier(.4,0,.2,1),stroke 0.3s}
-.gauge-label-wrap{text-align:center}
-.gauge-pct{font-size:1.25em;font-weight:800;fill:#fff;font-family:'Outfit',sans-serif}
-.gauge-info{font-size:0.76em;color:var(--text2);font-weight:500;line-height:1.4;text-align:center}
-.gauge-title{font-size:0.82em;font-weight:700;color:var(--text);text-align:center;margin-bottom:2px}
+.gauges{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-bottom:24px}
+.gauge-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;display:flex;flex-direction:column;align-items:center}
+.gauge-svg{width:120px;height:120px;position:relative}
+.gauge-svg circle{fill:none;stroke-width:8;stroke-linecap:round}
+.gauge-bg{stroke:var(--border)}
+.gauge-fill{transition:stroke-dashoffset 0.8s ease}
+.gauge-text{font-size:1.4em;font-weight:800;fill:#fff}
+.gauge-label{margin-top:12px;font-size:0.82em;color:var(--text2);text-align:center;font-weight:600}
 .cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius)}
 .card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -184,7 +181,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}
 .main{margin-left:0}
 .topbar{display:flex}
-.gauges{grid-template-columns:1fr 1fr}.cards-grid{grid-template-columns:1fr}
+.gauges{grid-template-columns:repeat(2,1fr)}.cards-grid{grid-template-columns:1fr}
 .stats-bar{grid-template-columns:1fr 1fr}
 .main-body{padding:16px}
 .cfg-grid{grid-template-columns:1fr}
@@ -238,40 +235,36 @@ Refresh
 <div class="page active" id="page-overview">
 <div class="gauges">
 <div class="gauge-card">
-<svg class="gauge-svg" viewBox="0 0 100 100">
-<circle class="gauge-track" cx="50" cy="50" r="38" stroke-dasharray="179.1 59.7" transform="rotate(135 50 50)"/>
-<circle class="gauge-fill" id="g-cpu" cx="50" cy="50" r="38" stroke-dasharray="0 238.8" transform="rotate(135 50 50)"/>
-<text class="gauge-pct" x="50" y="53" text-anchor="middle" id="g-cpu-t">0%</text>
+<svg class="gauge-svg" viewBox="0 0 120 120">
+<circle class="gauge-bg" cx="60" cy="60" r="50" stroke-dasharray="314" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+<circle class="gauge-fill" id="gauge-cpu" cx="60" cy="60" r="50" stroke="var(--accent)" stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)"/>
+<text class="gauge-text" x="60" y="63" text-anchor="middle" id="gauge-cpu-text">0%</text>
 </svg>
-<div class="gauge-title">CPU</div>
-<div class="gauge-info" id="g-cpu-info">-</div>
+<div class="gauge-label">CPU: <span id="cpu-cores">-</span> Cores</div>
 </div>
 <div class="gauge-card">
-<svg class="gauge-svg" viewBox="0 0 100 100">
-<circle class="gauge-track" cx="50" cy="50" r="38" stroke-dasharray="179.1 59.7" transform="rotate(135 50 50)"/>
-<circle class="gauge-fill" id="g-ram" cx="50" cy="50" r="38" stroke-dasharray="0 238.8" transform="rotate(135 50 50)"/>
-<text class="gauge-pct" x="50" y="53" text-anchor="middle" id="g-ram-t">0%</text>
+<svg class="gauge-svg" viewBox="0 0 120 120">
+<circle class="gauge-bg" cx="60" cy="60" r="50" stroke-dasharray="314" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+<circle class="gauge-fill" id="gauge-ram" cx="60" cy="60" r="50" stroke="var(--accent)" stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)"/>
+<text class="gauge-text" x="60" y="63" text-anchor="middle" id="gauge-ram-text">0%</text>
 </svg>
-<div class="gauge-title">RAM</div>
-<div class="gauge-info" id="g-ram-info">-</div>
+<div class="gauge-label">RAM: <span id="ram-info">-</span></div>
 </div>
 <div class="gauge-card">
-<svg class="gauge-svg" viewBox="0 0 100 100">
-<circle class="gauge-track" cx="50" cy="50" r="38" stroke-dasharray="179.1 59.7" transform="rotate(135 50 50)"/>
-<circle class="gauge-fill" id="g-disk" cx="50" cy="50" r="38" stroke-dasharray="0 238.8" transform="rotate(135 50 50)"/>
-<text class="gauge-pct" x="50" y="53" text-anchor="middle" id="g-disk-t">0%</text>
+<svg class="gauge-svg" viewBox="0 0 120 120">
+<circle class="gauge-bg" cx="60" cy="60" r="50" stroke-dasharray="314" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+<circle class="gauge-fill" id="gauge-swap" cx="60" cy="60" r="50" stroke="var(--accent)" stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)"/>
+<text class="gauge-text" x="60" y="63" text-anchor="middle" id="gauge-swap-text">0%</text>
 </svg>
-<div class="gauge-title">Storage</div>
-<div class="gauge-info" id="g-disk-info">-</div>
+<div class="gauge-label">Swap: <span id="swap-info">-</span></div>
 </div>
 <div class="gauge-card">
-<svg class="gauge-svg" viewBox="0 0 100 100">
-<circle class="gauge-track" cx="50" cy="50" r="38" stroke-dasharray="179.1 59.7" transform="rotate(135 50 50)"/>
-<circle class="gauge-fill" id="g-swap" cx="50" cy="50" r="38" stroke-dasharray="0 238.8" transform="rotate(135 50 50)"/>
-<text class="gauge-pct" x="50" y="53" text-anchor="middle" id="g-swap-t">0%</text>
+<svg class="gauge-svg" viewBox="0 0 120 120">
+<circle class="gauge-bg" cx="60" cy="60" r="50" stroke-dasharray="314" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+<circle class="gauge-fill" id="gauge-disk" cx="60" cy="60" r="50" stroke="var(--accent)" stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)"/>
+<text class="gauge-text" x="60" y="63" text-anchor="middle" id="gauge-disk-text">0%</text>
 </svg>
-<div class="gauge-title">Swap</div>
-<div class="gauge-info" id="g-swap-info">-</div>
+<div class="gauge-label">Storage: <span id="disk-info">-</span></div>
 </div>
 </div>
 
@@ -573,12 +566,12 @@ function nav(name,btn){
   else if(name==="settings") loadSettings();
 }
 
-function setG(fid,tid,pct){
-  const f=document.getElementById(fid);
-  const fill=Math.min(pct,100)/100*arc;
-  f.setAttribute("stroke-dasharray",fill+" "+(circ-fill));
-  f.setAttribute("stroke",pct>85?"#ef4444":pct>60?"#f59e0b":"var(--accent)");
-  document.getElementById(tid).textContent=pct.toFixed(1)+"%";
+function setG(id,pct){
+  const c=document.getElementById(id);
+  const offset=314-(314*Math.min(pct,100)/100);
+  c.setAttribute("stroke-dashoffset",offset);
+  const color=pct>85?"#ef4444":pct>60?"#f59e0b":"var(--accent)";
+  c.setAttribute("stroke",color);
 }
 
 function fmtB(b){
@@ -601,14 +594,18 @@ evt.onmessage=function(e){
   try{
     const d=JSON.parse(e.data);
     const s=d.system;
-    setG("g-cpu","g-cpu-t",s.cpu_percent);
-    document.getElementById("g-cpu-info").textContent="CPU: "+s.cpu_count+" Cores";
-    setG("g-ram","g-ram-t",s.ram_percent);
-    document.getElementById("g-ram-info").textContent=fmtMB(s.ram_used)+" / "+fmtMB(s.ram_total);
-    setG("g-disk","g-disk-t",s.disk_percent);
-    document.getElementById("g-disk-info").textContent=s.disk_used+" GB / "+s.disk_total+" GB";
-    setG("g-swap","g-swap-t",s.swap_percent);
-    document.getElementById("g-swap-info").textContent=fmtMB(s.swap_used)+" / "+fmtMB(s.swap_total);
+    setG("gauge-cpu",s.cpu_percent);
+    document.getElementById("gauge-cpu-text").textContent=s.cpu_percent+"%";
+    document.getElementById("cpu-cores").textContent=s.cpu_count;
+    setG("gauge-ram",s.ram_percent);
+    document.getElementById("gauge-ram-text").textContent=s.ram_percent+"%";
+    document.getElementById("ram-info").textContent=fmtMB(s.ram_used)+" / "+fmtMB(s.ram_total);
+    setG("gauge-disk",s.disk_percent);
+    document.getElementById("gauge-disk-text").textContent=s.disk_percent+"%";
+    document.getElementById("disk-info").textContent=s.disk_used+" GB / "+s.disk_total+" GB";
+    setG("gauge-swap",s.swap_percent);
+    document.getElementById("gauge-swap-text").textContent=s.swap_percent+"%";
+    document.getElementById("swap-info").textContent=fmtMB(s.swap_used)+" / "+fmtMB(s.swap_total);
     const now=Date.now();
     if(prevNet.t>0){
       const dt=(now-prevNet.t)/1000||1;
