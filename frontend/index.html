@@ -426,6 +426,7 @@ Refresh
 <div class="fg"><label class="fl">Panel Worker Threads</label><input class="fi" id="cfg-threads" type="number" placeholder="8"></div>
 <div class="fg"><label class="fl">Log File</label><input class="fi" id="cfg-log" placeholder="/var/log/ghostgate.log"></div>
 <div class="fg"><label class="fl">Update Proxy (optional)</label><input class="fi" id="cfg-update-proxy" placeholder="http://proxy:3128"></div>
+<div class="fg"><label class="fl">Auto Update</label><select class="fi" id="cfg-auto-update"><option value="false">Disabled</option><option value="true">Enabled</option></select></div>
 </div>
 </div>
 <div class="card">
@@ -902,10 +903,11 @@ async function checkUpdate(){
 }
 
 async function applyUpdate(){
-  if(!confirm("Apply update? GhostGate will restart."))return;
+  if(!confirm("Download and apply update? GhostGate will download the new version and restart."))return;
+  showAlert("cfg-alert","Downloading and applying update…","ok");
   await fetch(API+"/api/update",{method:"POST"});
-  showAlert("cfg-alert","Update triggered — restarting…","ok");
-  setTimeout(()=>location.reload(),8000);
+  showAlert("cfg-alert","Update applied — waiting for restart…","ok");
+  setTimeout(()=>location.reload(),10000);
 }
 
 async function bulkNodes(action){
@@ -1013,6 +1015,7 @@ async function loadSettings(){
   document.getElementById("cfg-admin").value=s.ADMIN_ID||"";
   document.getElementById("cfg-proxy").value=s.BOT_PROXY||"";
   document.getElementById("cfg-update-proxy").value=s.UPDATE_PROXY||"";
+  document.getElementById("cfg-auto-update").value=(s.AUTO_UPDATE||"false").toLowerCase();
 }
 async function saveSettings(){
   const body={
@@ -1030,7 +1033,8 @@ async function saveSettings(){
     BOT_TOKEN:document.getElementById("cfg-token").value.trim(),
     ADMIN_ID:document.getElementById("cfg-admin").value.trim(),
     BOT_PROXY:document.getElementById("cfg-proxy").value.trim(),
-    UPDATE_PROXY:document.getElementById("cfg-update-proxy").value.trim()
+    UPDATE_PROXY:document.getElementById("cfg-update-proxy").value.trim(),
+    AUTO_UPDATE:document.getElementById("cfg-auto-update").value
   };
   Object.keys(body).forEach(k=>{if(!body[k])delete body[k];});
   await fetch(API+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
