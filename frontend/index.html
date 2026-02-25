@@ -623,7 +623,7 @@ evt.onmessage=function(e){
     document.getElementById("st-active").textContent=d.active_subs;
     document.getElementById("st-nodes").textContent=d.nodes;
     const activePct=d.total_subs?Math.round(d.active_subs*100/d.total_subs):0;
-    document.getElementById("st-active").style.color=activePct<50?"#ef4444":activePct<80?"#f59e0b":"#00e5a0";
+    document.getElementById("st-active").style.color=activePct<=60?"#ef4444":activePct<=85?"#f59e0b":"#00e5a0";
     if(document.getElementById("ss-total")) document.getElementById("ss-total").textContent=d.total_subs;
     if(document.getElementById("ss-active")) document.getElementById("ss-active").textContent=d.active_subs;
     if(document.getElementById("ss-nodes")) document.getElementById("ss-nodes").textContent=d.nodes;
