@@ -671,8 +671,10 @@ function renderSubRow(sub){
   const exactLimit=limitB>0?limitB.toLocaleString()+" bytes ("+sub.data_gb+" GB)":"Unlimited";
   const dataTip=`Used: ${exactUsed}\nLimit: ${exactLimit}\n${pct}% consumed`;
   const dataCol=limitB>0?`<div class="prog" title="${dataTip}"><div class="prog-bar"><div class="prog-fill${progCls}" style="width:${pct}%"></div></div><span class="prog-txt">${(usedB/1073741824).toFixed(1)} / ${sub.data_gb} GB</span></div>`:`<span class="prog-txt" title="${dataTip}">${(usedB/1073741824).toFixed(1)} GB / ∞</span>`;
-  const expStr=sub.expire_at?sub.expire_at.substring(0,10):"Never";
-  const expTip=sub.expire_at?`Exact expiry: ${sub.expire_at}`:"No expiry set";
+  const firstuseSec=parseInt(sub.expire_after_first_use_seconds)||0;
+  const firstuseDays=firstuseSec>0?Math.round(firstuseSec/86400):0;
+  const expStr=sub.expire_at?sub.expire_at.substring(0,10):(firstuseSec>0?`${firstuseDays}d after 1st use`:"Never");
+  const expTip=sub.expire_at?`Exact expiry: ${sub.expire_at}`:(firstuseSec>0?`Expiry starts after first use (${firstuseDays} days)`:"No expiry set");
   return `<tr data-sub-id="${sub.id}">
 <td><input type="checkbox" class="sub-chk" value="${sub.id}" onchange="toggleSubSel('${sub.id}',this.checked)" ${selectedSubs.has(sub.id)?"checked":""} style="accent-color:var(--accent)"></td>
 <td><span class="tbl-id">${sub.id.substring(0,12)}…</span></td>
@@ -810,8 +812,20 @@ async function editSub(id){
 }
 
 let _removeExpiry=false,_removeDataLimit=false;
-function setNoExpire(){ _removeExpiry=true; document.getElementById("me-days").value=0; document.getElementById("me-days").disabled=true; document.getElementById("me-no-expire-btn").textContent="✓ No Expiry Set"; document.getElementById("me-no-expire-btn").style.color="var(--accent)"; }
-function setNoDataLimit(){ _removeDataLimit=true; document.getElementById("me-data").value=0; document.getElementById("me-data").disabled=true; document.getElementById("me-no-limit-btn").textContent="✓ No Limit Set"; document.getElementById("me-no-limit-btn").style.color="var(--accent)"; }
+function setNoExpire(){
+  _removeExpiry=!_removeExpiry;
+  document.getElementById("me-days").disabled=_removeExpiry;
+  if(_removeExpiry){ document.getElementById("me-days").value=0; }
+  document.getElementById("me-no-expire-btn").textContent=_removeExpiry?"✓ No Expiry Set":"Set No Expiry";
+  document.getElementById("me-no-expire-btn").style.color=_removeExpiry?"var(--accent)":"";
+}
+function setNoDataLimit(){
+  _removeDataLimit=!_removeDataLimit;
+  document.getElementById("me-data").disabled=_removeDataLimit;
+  if(_removeDataLimit){ document.getElementById("me-data").value=0; }
+  document.getElementById("me-no-limit-btn").textContent=_removeDataLimit?"✓ No Limit Set":"Set No Data Limit";
+  document.getElementById("me-no-limit-btn").style.color=_removeDataLimit?"var(--accent)":"";
+}
 async function submitEdit(){
   if(!editingSubId) return;
   const body={comment:document.getElementById("me-comment").value.trim(),data_gb:_removeDataLimit?0:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
