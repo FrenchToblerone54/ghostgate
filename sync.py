@@ -81,18 +81,31 @@ def _sync_first_use_expiry():
             continue
         snodes = db.get_sub_nodes(sid)
         earliest_expiry_ms = None
+        has_any_expiry = False
         for sn in snodes:
             try:
                 xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
                 client = xui.get_client_by_email(sn["inbound_id"], sn["email"])
                 if client:
                     expiry_ms = client.get("expiryTime", 0)
+                    if expiry_ms != 0:
+                        has_any_expiry = True
                     if expiry_ms > 0:
                         if earliest_expiry_ms is None or expiry_ms < earliest_expiry_ms:
                             earliest_expiry_ms = expiry_ms
             except Exception as e:
                 logger.warning(f"first-use expiry check error node {sn['node_id']} sub {sid}: {e}")
-        if earliest_expiry_ms:
+        if not has_any_expiry:
+            expire_ms = -seconds * 1000
+            ip_limit = sub.get("ip_limit", 0)
+            for sn in snodes:
+                try:
+                    xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                    xui.update_client_expiry_ip(sn["inbound_id"], sn["client_uuid"], sn["email"], expire_ms, ip_limit)
+                    logger.info(f"Set initial negative expiry on node {sn['node_id']} for sub {sid}: {expire_ms}")
+                except Exception as e:
+                    logger.warning(f"set initial expiry error node {sn['node_id']} sub {sid}: {e}")
+        elif earliest_expiry_ms:
             expire_at = datetime.fromtimestamp(earliest_expiry_ms / 1000, tz=timezone.utc).isoformat()
             db.update_sub(sid, expire_at=expire_at)
             logger.info(f"Set expire_at for sub {sid} based on first use: {expire_at}")
