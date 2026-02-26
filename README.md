@@ -195,7 +195,7 @@ The end-user subscription URL is public and requires no authentication:
 https://your-domain.com/sub/<id>
 ```
 
-This returns a base64-encoded config list (VLESS and VMess) compatible with standard VPN clients.
+This returns a plain-text config list (VLESS and VMess) compatible with standard VPN clients.
 
 ## nginx Configuration
 
