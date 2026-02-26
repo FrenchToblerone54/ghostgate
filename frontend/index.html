@@ -665,7 +665,7 @@ function renderSubRow(sub){
   const isDisabled=sub.enabled===0||sub.enabled===false;
   const statusBadge=isDisabled?'<span class="badge badge-muted">Disabled</span>':isExp||isOver?`<span class="badge badge-red">${isExp?"Expired":"Over Limit"}</span>`:'<span class="badge badge-green">Active</span>';
   const nn=(sub.node_names||[]);
-  const nodes=nn.length?`<span class="badge badge-muted" style="font-size:0.72em" title="${nn.join(", ")}">${nn.length} node${nn.length>1?"s":""}</span>`:'<span style="color:var(--text3);font-size:0.8em">—</span>';
+  const nodes=nn.length?`<span class="badge badge-muted" style="font-size:0.72em;cursor:pointer" title="${nn.join(", ")}" onclick="alert('Nodes: ${nn.join(", ")}')">${nn.length} node${nn.length>1?"s":""}</span>`:'<span style="color:var(--text3);font-size:0.8em">—</span>';
   const progCls=pct>85?" d":pct>65?" w":"";
   const exactUsed=usedB.toLocaleString()+" bytes ("+((usedB/1073741824).toFixed(4))+" GB)";
   const exactLimit=limitB>0?limitB.toLocaleString()+" bytes ("+sub.data_gb+" GB)":"Unlimited";
@@ -762,7 +762,9 @@ async function viewSub(id){
   document.getElementById("md-url").textContent=url;
   const used=(sub.used_bytes||0)/1073741824;
   const totalStr=sub.data_gb>0?sub.data_gb+" GB":"Unlimited";
-  const expStr=sub.expire_at?sub.expire_at.substring(0,16):"Never";
+  const firstuseSec=parseInt(sub.expire_after_first_use_seconds)||0;
+  const firstuseDays=firstuseSec>0?Math.round(firstuseSec/86400):0;
+  const expStr=sub.expire_at?sub.expire_at.substring(0,16):(firstuseSec>0?`${firstuseDays} days after 1st use`:"Never");
   const nodes=(sub.nodes||[]).map(n=>n.name||n).join(", ")||"None";
   const fmtDate=s=>s?s.substring(0,16).replace("T"," "):"—";
   const firstStr=stats.first_access?`<span title="${stats.first_access}">${fmtDate(stats.first_access)}</span>`:"—";
