@@ -670,7 +670,7 @@ function renderSubRow(sub){
   const exactUsed=usedB.toLocaleString()+" bytes ("+((usedB/1073741824).toFixed(4))+" GB)";
   const exactLimit=limitB>0?limitB.toLocaleString()+" bytes ("+sub.data_gb+" GB)":"Unlimited";
   const dataTip=`Used: ${exactUsed}\nLimit: ${exactLimit}\n${pct}% consumed`;
-  const dataCol=limitB>0?`<div class="prog" title="${dataTip}"><div class="prog-bar"><div class="prog-fill${progCls}" style="width:${pct}%"></div></div><span class="prog-txt">${(usedB/1073741824).toFixed(1)} / ${sub.data_gb} GB</span></div>`:`<span class="prog-txt" title="${dataTip}">${(usedB/1073741824).toFixed(1)} GB / ∞</span>`;
+  const dataCol=limitB>0?`<div class="prog" title="${dataTip}" onclick="alert(this.title)" style="cursor:pointer"><div class="prog-bar"><div class="prog-fill${progCls}" style="width:${pct}%"></div></div><span class="prog-txt">${(usedB/1073741824).toFixed(1)} / ${sub.data_gb} GB</span></div>`:`<span class="prog-txt" title="${dataTip}" onclick="alert(this.title)" style="cursor:pointer">${(usedB/1073741824).toFixed(1)} GB / ∞</span>`;
   const firstuseSec=parseInt(sub.expire_after_first_use_seconds)||0;
   const firstuseDays=firstuseSec>0?Math.round(firstuseSec/86400):0;
   const expStr=sub.expire_at?sub.expire_at.substring(0,10):(firstuseSec>0?`${firstuseDays}d after 1st use`:"Never");
@@ -680,7 +680,7 @@ function renderSubRow(sub){
 <td><span class="tbl-id">${sub.id.substring(0,12)}…</span></td>
 <td class="tbl-comment">${sub.comment||'<span style="color:var(--text3)">—</span>'}</td>
 <td>${dataCol}</td>
-<td style="font-size:0.84em;color:var(--text2)" title="${expTip}">${expStr}</td>
+<td style="font-size:0.84em;color:var(--text2);cursor:pointer" title="${expTip}" onclick="alert(this.title)">${expStr}</td>
 <td>${nodes}</td>
 <td>${statusBadge}</td>
 <td><div class="tbl-actions">
@@ -765,6 +765,8 @@ async function viewSub(id){
   const firstuseSec=parseInt(sub.expire_after_first_use_seconds)||0;
   const firstuseDays=firstuseSec>0?Math.round(firstuseSec/86400):0;
   const expStr=sub.expire_at?sub.expire_at.substring(0,16):(firstuseSec>0?`${firstuseDays} days after 1st use`:"Never");
+  const usedExact=`${(sub.used_bytes||0).toLocaleString()} bytes (${used.toFixed(4)} GB) / ${sub.data_gb>0?((sub.data_gb*1073741824).toLocaleString()+" bytes ("+sub.data_gb+" GB)"):"Unlimited"}`;
+  const expExact=sub.expire_at?`Exact expiry: ${sub.expire_at}`:(firstuseSec>0?`Expiry starts after first use (${firstuseDays} days)`:"No expiry set");
   const nodes=(sub.nodes||[]).map(n=>n.name||n).join(", ")||"None";
   const fmtDate=s=>s?s.substring(0,16).replace("T"," "):"—";
   const firstStr=stats.first_access?`<span title="${stats.first_access}">${fmtDate(stats.first_access)}</span>`:"—";
@@ -774,8 +776,8 @@ async function viewSub(id){
   const rows=[
     ["ID",`<span class="tbl-id">${id}</span>`],
     ["Comment",sub.comment||"—"],
-    ["Data Used",used.toFixed(2)+" GB / "+totalStr],
-    ["Expires",expStr],
+    ["Data Used",`<span title="${usedExact}" onclick="alert(this.title)" style="cursor:pointer">${used.toFixed(2)} GB / ${totalStr}</span>`],
+    ["Expires",`<span title="${expExact}" onclick="alert(this.title)" style="cursor:pointer">${expStr}</span>`],
     ["IP Limit",sub.ip_limit||"Unlimited"],
     ["Nodes",nodes],
     ["Created",sub.created_at?sub.created_at.substring(0,10):"—"],
