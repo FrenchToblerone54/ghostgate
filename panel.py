@@ -250,7 +250,7 @@ def register_routes(panel_path):
         search = request.args.get("search", "").strip() or None
         subs, total = db.get_subs(page, per_page, search)
         for sub in subs:
-            sub["node_names"] = [sn["name"] for sn in db.get_sub_nodes(sub["id"])]
+            sub["node_names"] = [sn.get("inbound_name") or sn["name"] for sn in db.get_sub_nodes(sub["id"])]
         return jsonify({"subs": subs, "total": total, "page": page, "per_page": per_page})
 
     @app.route(f"/{panel_path}/api/subscriptions/stream")
@@ -262,7 +262,7 @@ def register_routes(panel_path):
                 try:
                     subs, _ = db.get_subs(1, 0)
                     for sub in subs:
-                        sub["node_names"] = [sn["name"] for sn in db.get_sub_nodes(sub["id"])]
+                        sub["node_names"] = [sn.get("inbound_name") or sn["name"] for sn in db.get_sub_nodes(sub["id"])]
                     curr = {s["id"]: s for s in subs}
                     changed = False
                     if not first:
@@ -307,22 +307,22 @@ def register_routes(panel_path):
         expiry_time = -expire_after if expire_after>0 and not sub.get("expire_at") else expire_ms
         errors = []
         for node_id in node_ids:
-            node = db.get_node(node_id)
-            if not node:
+            ni = db.get_node_inbound_with_node(node_id)
+            if not ni:
                 continue
             try:
-                xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
-                total_limit_bytes = int(max(0, data_gb * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
+                xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+                total_limit_bytes = int(max(0, data_gb * 1073741824 - (sub.get("used_bytes") or 0)) / (ni.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
                 email = f"{sub_id}-{node_id}"
                 expiry_time = -expire_after_first_use_seconds*1000 if expire_after_first_use_seconds>0 else expire_ms
                 client = xui.make_client(email, client_uuid, expiry_time, ip_limit, sub_id, comment or "", total_limit_bytes)
-                ok = xui.add_client(node["inbound_id"], client)
+                ok = xui.add_client(ni["inbound_id"], client)
                 if ok:
                     db.add_sub_node(sub_id, node_id, client_uuid, email)
                 else:
-                    errors.append(f"node {node_id}: failed to add client")
+                    errors.append(f"inbound {node_id}: failed to add client")
             except Exception as e:
-                errors.append(f"node {node_id}: {e}")
+                errors.append(f"inbound {node_id}: {e}")
         base_url = BASE_URL or request.host_url.rstrip("/")
         return jsonify({"id": sub_id, "uuid": client_uuid, "url": f"{base_url}/sub/{sub_id}", "errors": errors})
 
@@ -422,13 +422,13 @@ def register_routes(panel_path):
         for node_id in node_ids:
             if node_id in existing:
                 continue
-            node = db.get_node(node_id)
-            if not node:
+            ni = db.get_node_inbound_with_node(node_id)
+            if not ni:
                 continue
             try:
                 client_uuid = str(uuid.uuid4())
-                xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
-                total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
+                xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+                total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (ni.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
                 email = f"{sub_id}-{node_id}"
                 client = xui.make_client(email, client_uuid, expiry_time, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
                 now = datetime.now(timezone.utc)
@@ -437,15 +437,15 @@ def register_routes(panel_path):
                 is_over_limit = sub["data_gb"] > 0 and (sub.get("used_bytes") or 0) >= sub["data_gb"] * 1073741824
                 if is_disabled or is_expired or is_over_limit:
                     client["enable"] = False
-                ok = xui.add_client(node["inbound_id"], client)
+                ok = xui.add_client(ni["inbound_id"], client)
                 if ok:
                     db.add_sub_node(sub_id, node_id, client_uuid, email)
                     if is_disabled or is_expired or is_over_limit:
                         db.set_sub_node_disabled(sub_id, node_id, True)
                 else:
-                    errors.append(f"node {node_id}: failed to add client")
+                    errors.append(f"inbound {node_id}: failed to add client")
             except Exception as e:
-                errors.append(f"node {node_id}: {e}")
+                errors.append(f"inbound {node_id}: {e}")
         return jsonify({"ok": True, "errors": errors})
 
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/nodes/<int:node_id>", methods=["DELETE"])
@@ -485,13 +485,13 @@ def register_routes(panel_path):
                 for node_id in node_ids:
                     if node_id in existing:
                         continue
-                    node = db.get_node(node_id)
-                    if not node:
+                    ni = db.get_node_inbound_with_node(node_id)
+                    if not ni:
                         continue
                     try:
                         client_uuid = str(uuid.uuid4())
-                        xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
-                        total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
+                        xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+                        total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (ni.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
                         email = f"{sub_id}-{node_id}"
                         client = xui.make_client(email, client_uuid, expiry_time, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
                         now = datetime.now(timezone.utc)
@@ -500,15 +500,15 @@ def register_routes(panel_path):
                         is_over_limit = sub["data_gb"] > 0 and (sub.get("used_bytes") or 0) >= sub["data_gb"] * 1073741824
                         if is_disabled or is_expired or is_over_limit:
                             client["enable"] = False
-                        ok = xui.add_client(node["inbound_id"], client)
+                        ok = xui.add_client(ni["inbound_id"], client)
                         if ok:
                             db.add_sub_node(sub_id, node_id, client_uuid, email)
                             if is_disabled or is_expired or is_over_limit:
                                 db.set_sub_node_disabled(sub_id, node_id, True)
                         else:
-                            errors.append(f"{sub_id}/node {node_id}: failed")
+                            errors.append(f"{sub_id}/inbound {node_id}: failed")
                     except Exception as e:
-                        errors.append(f"{sub_id}/node {node_id}: {e}")
+                        errors.append(f"{sub_id}/inbound {node_id}: {e}")
             elif action == "remove":
                 snodes = db.get_sub_nodes(sub_id)
                 for node_id in node_ids:
@@ -622,16 +622,13 @@ def register_routes(panel_path):
         nodes = db.get_nodes()
         for n in nodes:
             n.pop("password", None)
+            n["inbounds"] = db.get_node_inbounds(n["id"])
         return jsonify(nodes)
 
     @app.route(f"/{panel_path}/api/nodes", methods=["POST"])
     def api_nodes_create():
         data = request.json
-        node_id = db.add_node(
-            data["name"], data["address"], data["username"],
-            data["password"], int(data["inbound_id"]), data.get("proxy_url"),
-            max(1.0, float(data.get("traffic_multiplier", 1.0)))
-        )
+        node_id = db.add_node(data["name"], data["address"], data["username"], data["password"], data.get("proxy_url"))
         return jsonify({"id": node_id})
 
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>", methods=["PUT"])
@@ -643,6 +640,27 @@ def register_routes(panel_path):
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>", methods=["DELETE"])
     def api_node_delete(node_id):
         db.delete_node(node_id)
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds")
+    def api_node_inbounds_list(node_id):
+        return jsonify(db.get_node_inbounds(node_id))
+
+    @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds", methods=["POST"])
+    def api_node_inbound_create(node_id):
+        data = request.json
+        ni_id = db.add_node_inbound(node_id, int(data["inbound_id"]), data.get("name"), float(data.get("traffic_multiplier", 1.0)))
+        return jsonify({"id": ni_id})
+
+    @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds/<int:ni_id>", methods=["PUT"])
+    def api_node_inbound_update(node_id, ni_id):
+        data = request.json
+        db.update_node_inbound(ni_id, **data)
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds/<int:ni_id>", methods=["DELETE"])
+    def api_node_inbound_delete(node_id, ni_id):
+        db.delete_node_inbound(ni_id)
         return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/nodes/test", methods=["POST"])
@@ -668,7 +686,19 @@ def register_routes(panel_path):
         try:
             xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
             ok = xui.test_connection()
-            inbound = xui.get_inbound(node["inbound_id"]) if ok else None
+            return jsonify({"ok": ok})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)})
+
+    @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds/<int:ni_id>/test")
+    def api_node_inbound_test(node_id, ni_id):
+        ni = db.get_node_inbound_with_node(ni_id)
+        if not ni:
+            return jsonify({"ok": False, "error": "not found"}), 404
+        try:
+            xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+            ok = xui.test_connection()
+            inbound = xui.get_inbound(ni["inbound_id"]) if ok else None
             return jsonify({"ok": ok, "protocol": inbound.get("protocol") if inbound else None})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)})

@@ -148,13 +148,31 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .fi::placeholder{color:var(--text3)}
 .fi[readonly]{opacity:0.6;cursor:default}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.nodes-list{display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto}
-.node-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer;transition:border-color 0.15s}
+.nodes-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
+.node-group{margin-bottom:2px}
+.node-group-label{font-size:0.72em;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;padding:4px 6px 2px;opacity:0.7}
+.node-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer;transition:border-color 0.15s;margin-left:8px}
 .node-item:hover{border-color:var(--border2)}
 .node-item input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;flex-shrink:0}
 .node-item label{cursor:pointer;flex:1}
 .node-item-name{font-size:0.86em;font-weight:700;color:var(--text)}
 .node-item-addr{font-size:0.74em;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.ntree{display:flex;flex-direction:column;gap:10px;padding:16px}
+.nparent{background:var(--card2);border:1px solid var(--border);border-radius:var(--radius)}
+.nparent-hd{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.nparent-info{flex:1;min-width:0}
+.nparent-name{font-size:0.92em;font-weight:800;color:#fff}
+.nparent-addr{font-size:0.74em;color:var(--text2);font-family:'JetBrains Mono',monospace;margin-top:2px;word-break:break-all}
+.nparent-acts{display:flex;gap:5px;flex-shrink:0}
+.nsubs{padding:8px 14px 12px 14px;display:flex;flex-direction:column;gap:6px}
+.nsub-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card)}
+.nsub-connector{color:var(--text3);font-size:0.78em;flex-shrink:0;font-family:'JetBrains Mono',monospace}
+.nsub-info{flex:1;min-width:0}
+.nsub-name{font-size:0.84em;font-weight:700;color:var(--text)}
+.nsub-id{font-size:0.72em;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.nsub-acts{display:flex;gap:5px;flex-shrink:0}
+.nadd-sub{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-sm);border:1px dashed var(--border);color:var(--text3);font-size:0.78em;font-weight:600;cursor:pointer;background:none;font-family:'Outfit',sans-serif;transition:all 0.15s;width:100%;margin-top:4px}
+.nadd-sub:hover{border-color:var(--accent-border);color:var(--accent)}
 .detail-qr{display:block;margin:0 auto;max-width:190px;border-radius:8px;background:#0a0f1a;padding:10px}
 .detail-url{display:flex;align-items:center;gap:0;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:14px}
 .detail-url code{flex:1;padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:0.75em;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -387,14 +405,7 @@ Refresh
 <button class="btn btn-accent" onclick="openNodeModal(null)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Node</button>
 </div>
 <div id="n-alert" class="alert"></div>
-<div class="card">
-<div class="table-wrap">
-<table class="tbl">
-<thead><tr><th>#</th><th>Name</th><th>Address</th><th>Inbound</th><th>×Mult</th><th>Proxy</th><th>Status</th><th></th></tr></thead>
-<tbody id="n-tbody"></tbody>
-</table>
-</div>
-</div>
+<div id="n-tree" class="ntree"></div>
 </div>
 
 <div class="page" id="page-logs">
@@ -526,16 +537,32 @@ Refresh
 <div class="fg"><label class="fl">Username</label><input class="fi" id="mn-user" placeholder="admin"></div>
 <div class="fg"><label class="fl">Password</label><input class="fi" id="mn-pass" type="password" placeholder="password"></div>
 </div>
-<div class="fr">
-<div class="fg"><label class="fl">Inbound ID</label><input class="fi" id="mn-inbound" type="number" placeholder="1"></div>
-<div class="fg" style="max-width:130px"><label class="fl">Traffic Multiplier</label><input class="fi" id="mn-multiplier" type="number" step="0.1" min="1" placeholder="1"></div>
-</div>
 <div class="fg"><label class="fl">HTTP/HTTPS Proxy</label><input class="fi" id="mn-proxy" placeholder="http://proxy:3128 (optional)"></div>
 </div>
 <div class="modal-ft">
 <button class="btn btn-ghost" onclick="closeM('m-node')">Cancel</button>
-<button class="btn btn-ghost" onclick="testNewNode()">Test</button>
+<button class="btn btn-ghost" onclick="testNewNode()">Test Connection</button>
 <button class="btn btn-accent" onclick="submitNode()">Save</button>
+</div>
+</div>
+</div>
+
+<div class="overlay" id="m-inbound">
+<div class="modal">
+<div class="modal-hd"><h3 id="mi-title">Add Sub-node</h3><button class="modal-x" onclick="closeM('m-inbound')">&#215;</button></div>
+<div class="modal-bd">
+<div id="mi-alert" class="alert"></div>
+<div class="fg"><label class="fl">Display Name</label><input class="fi" id="mi-name" placeholder="e.g. Germany 1"></div>
+<div class="fr">
+<div class="fg"><label class="fl">Inbound ID</label><input class="fi" id="mi-inbound" type="number" placeholder="1" min="1"></div>
+<div class="fg" style="max-width:130px"><label class="fl">Traffic Multiplier</label><input class="fi" id="mi-multiplier" type="number" step="0.1" min="1" placeholder="1"></div>
+</div>
+<div class="fg"><label class="fl">Status</label><select class="fi" id="mi-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+</div>
+<div class="modal-ft">
+<button class="btn btn-ghost" onclick="closeM('m-inbound')">Cancel</button>
+<button class="btn btn-ghost" onclick="testInboundModal()">Test</button>
+<button class="btn btn-accent" onclick="submitInbound()">Save</button>
 </div>
 </div>
 </div>
@@ -543,7 +570,7 @@ Refresh
 <script>
 const API="{{prefix}}";
 let sPage=1,sTotalPages=1,sSearch="",sTimer=null,sPerPage=20;
-let editingSubId=null,editingNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set();
+let editingSubId=null,editingNodeId=null,editingNiId=null,editingInboundNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set();
 let logStream=null,liveLog=false;
 let subsStream=null;
 let prevNet={sent:0,recv:0,t:0};
@@ -729,9 +756,7 @@ async function openCreate(){
   document.getElementById("mc-submit").textContent="Create";
   document.getElementById("mc-sm").value="1";
   const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
-  document.getElementById("mc-nodes").innerHTML=nodes.length===0
-    ?'<div style="color:var(--text2);font-size:0.84em;padding:8px">No nodes configured. Add nodes in the Nodes section first.</div>'
-    :nodes.map(n=>`<label class="node-item"><input type="checkbox" value="${n.id}" ${n.enabled?"checked":""}><div><div class="node-item-name">${n.name}</div><div class="node-item-addr">${n.address}</div></div></label>`).join("");
+  document.getElementById("mc-nodes").innerHTML=_renderInboundSelector(nodes,new Set());
   document.getElementById("m-create").classList.add("open");
 }
 
@@ -815,7 +840,7 @@ async function editSub(id){
   document.getElementById("me-sm").value=sub.show_multiplier||1;
   const assignedIds=new Set((sub.nodes||[]).map(n=>n.node_id));
   editingOrigNodes=new Set(assignedIds);
-  document.getElementById("me-nodes").innerHTML=nodes.length?nodes.map(n=>`<label class="node-item"><input type="checkbox" value="${n.id}" ${assignedIds.has(n.id)?"checked":""}><div><div class="node-item-name">${n.name}</div><div class="node-item-addr">${n.address}</div></div></label>`).join(""):'<div style="color:var(--text2);font-size:0.85em;padding:8px">No nodes configured.</div>';
+  document.getElementById("me-nodes").innerHTML=_renderInboundSelector(nodes,assignedIds);
   document.getElementById("m-edit").classList.add("open");
 }
 
@@ -872,7 +897,7 @@ async function updateBulkBar(){
   document.getElementById("bulk-count").textContent=n+" selected";
   if(n>0&&!document.getElementById("bulk-node").options.length){
     const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
-    document.getElementById("bulk-node").innerHTML=nodes.map(nd=>`<option value="${nd.id}">${nd.name}</option>`).join("");
+    document.getElementById("bulk-node").innerHTML=nodes.flatMap(nd=>(nd.inbounds||[]).map(ni=>`<option value="${ni.id}">${nd.name} / ${ni.name||"Inbound "+ni.inbound_id}</option>`)).join("");
   }
 }
 
@@ -959,35 +984,53 @@ async function deleteSub(id){
   loadSubs(); showAlert("s-alert","Deleted","ok");
 }
 
+function _renderInboundSelector(nodes, checkedIds){
+  const filtered=nodes.filter(n=>(n.inbounds||[]).length>0);
+  if(filtered.length===0) return '<div style="color:var(--text2);font-size:0.84em;padding:8px">No sub-nodes configured. Add nodes and sub-nodes in the Nodes section first.</div>';
+  return filtered.map(n=>`<div class="node-group"><div class="node-group-label">${n.name}</div>${(n.inbounds||[]).map(ni=>`<label class="node-item"><input type="checkbox" value="${ni.id}" ${checkedIds.has(ni.id)?"checked":""}><div><div class="node-item-name">${ni.name||"Inbound "+ni.inbound_id}</div><div class="node-item-addr">ID: ${ni.inbound_id}</div></div></label>`).join("")}</div>`).join("");
+}
+
 async function loadNodes(){
   const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
-  if(nodes.length===0){ document.getElementById("n-tbody").innerHTML='<tr><td colspan="7"><div class="empty-state"><p>No nodes configured. Add a 3x-ui panel to get started.</p></div></td></tr>'; return; }
-  document.getElementById("n-tbody").innerHTML=nodes.map(n=>`<tr>
-<td style="color:var(--text2)">${n.id}</td>
-<td style="font-weight:700">${n.name}</td>
-<td><span style="font-family:'JetBrains Mono',monospace;font-size:0.78em;color:var(--text2)">${n.address}</span></td>
-<td><span class="badge badge-muted">${n.inbound_id}</span></td>
-<td>${(n.traffic_multiplier&&n.traffic_multiplier!=1)?`<span class="badge badge-yellow" style="font-size:0.72em">×${n.traffic_multiplier}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
-<td>${n.proxy_url?`<span class="badge badge-blue" style="font-size:0.72em">Proxy</span>`:'<span style="color:var(--text3)">—</span>'}</td>
-<td><span class="badge ${n.enabled?"badge-green":"badge-red"}">${n.enabled?"Enabled":"Disabled"}</span></td>
-<td><div class="tbl-actions">
-<button class="btn btn-icon btn-sm" onclick="testNodeId(${n.id})">Test</button>
+  const tree=document.getElementById("n-tree");
+  if(nodes.length===0){ tree.innerHTML='<div class="empty-state"><p>No nodes configured. Click <b>Add Node</b> to get started.</p></div>'; return; }
+  tree.innerHTML=nodes.map(n=>{
+    const inbounds=(n.inbounds||[]);
+    const subnodes=inbounds.map(ni=>`
+<div class="nsub-row">
+<span class="nsub-connector">└─</span>
+<div class="nsub-info"><div class="nsub-name">${ni.name||"Inbound "+ni.inbound_id}</div><div class="nsub-id">Inbound ID: ${ni.inbound_id}${ni.traffic_multiplier&&ni.traffic_multiplier!=1?" · ×"+ni.traffic_multiplier:""}</div></div>
+<span class="badge ${ni.enabled?"badge-green":"badge-red"}" style="font-size:0.7em;flex-shrink:0">${ni.enabled?"On":"Off"}</span>
+<div class="nsub-acts">
+<button class="btn btn-icon btn-sm" onclick="testInbound(${n.id},${ni.id})" title="Test">Test</button>
+<button class="btn btn-icon btn-sm" onclick="openInboundModal(${n.id},${ni.id})" title="Edit"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+<button class="btn btn-danger btn-sm" onclick="deleteInbound(${n.id},${ni.id})">Del</button>
+</div>
+</div>`).join("");
+    return `<div class="nparent">
+<div class="nparent-hd">
+<div class="nparent-info"><div class="nparent-name">${n.name}</div><div class="nparent-addr">${n.address}${n.proxy_url?" · <span style='color:var(--blue)'>Proxy</span>":""}</div></div>
+<span class="badge ${n.enabled?"badge-green":"badge-red"}" style="font-size:0.7em;flex-shrink:0">${n.enabled?"On":"Off"}</span>
+<div class="nparent-acts">
 <button class="btn btn-icon btn-sm" onclick="openNodeModal(${n.id})" title="Edit"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
 <button class="btn btn-danger btn-sm" onclick="deleteNode(${n.id})">Del</button>
-</div></td></tr>`).join("");
+</div>
+</div>
+<div class="nsubs">${subnodes}<button class="nadd-sub" onclick="openInboundModal(${n.id},null)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Sub-node</button></div>
+</div>`;
+  }).join("");
 }
 
 async function openNodeModal(id){
   editingNodeId=id;
   document.getElementById("mn-title").textContent=id?"Edit Node":"Add Node";
-  if(!id){ ["mn-name","mn-addr","mn-user","mn-pass","mn-proxy"].forEach(x=>document.getElementById(x).value=""); document.getElementById("mn-inbound").value="1"; document.getElementById("mn-multiplier").value="1"; }
-  else{ const nodes=await fetch(API+"/api/nodes").then(r=>r.json()); const n=nodes.find(x=>x.id===id); if(n){ document.getElementById("mn-name").value=n.name||""; document.getElementById("mn-addr").value=n.address||""; document.getElementById("mn-user").value=n.username||""; document.getElementById("mn-pass").value=""; document.getElementById("mn-inbound").value=n.inbound_id||1; document.getElementById("mn-multiplier").value=n.traffic_multiplier||1; document.getElementById("mn-proxy").value=n.proxy_url||""; } }
+  if(!id){ ["mn-name","mn-addr","mn-user","mn-pass","mn-proxy"].forEach(x=>document.getElementById(x).value=""); }
+  else{ const nodes=await fetch(API+"/api/nodes").then(r=>r.json()); const n=nodes.find(x=>x.id===id); if(n){ document.getElementById("mn-name").value=n.name||""; document.getElementById("mn-addr").value=n.address||""; document.getElementById("mn-user").value=n.username||""; document.getElementById("mn-pass").value=""; document.getElementById("mn-proxy").value=n.proxy_url||""; } }
   document.getElementById("m-node").classList.add("open");
 }
 
 async function submitNode(){
-  const mult=parseFloat(document.getElementById("mn-multiplier").value)||1;
-  const body={name:document.getElementById("mn-name").value.trim(),address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,inbound_id:parseInt(document.getElementById("mn-inbound").value)||1,traffic_multiplier:Math.max(1,mult),proxy_url:document.getElementById("mn-proxy").value.trim()||null};
+  const body={name:document.getElementById("mn-name").value.trim(),address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,proxy_url:document.getElementById("mn-proxy").value.trim()||null};
   if(!body.name||!body.address||!body.username||!body.password){ showAlert("mn-alert","Name, address, username and password are required","err"); return; }
   if(editingNodeId){ await fetch(API+"/api/nodes/"+editingNodeId,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
   else{ await fetch(API+"/api/nodes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
@@ -995,18 +1038,61 @@ async function submitNode(){
 }
 
 async function testNewNode(){
-  const body={address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,inbound_id:parseInt(document.getElementById("mn-inbound").value)||1,proxy_url:document.getElementById("mn-proxy").value.trim()||null};
+  const body={address:document.getElementById("mn-addr").value.trim(),username:document.getElementById("mn-user").value.trim(),password:document.getElementById("mn-pass").value,proxy_url:document.getElementById("mn-proxy").value.trim()||null};
   const tr=await fetch(API+"/api/nodes/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(x=>x.json());
-  showAlert("mn-alert",tr.ok?`Connected! Protocol: ${tr.protocol||"unknown"}`:`Failed: ${tr.error||"unreachable"}`,tr.ok?"ok":"err");
+  showAlert("mn-alert",tr.ok?"Connected!":"Failed: "+(tr.error||"unreachable"),tr.ok?"ok":"err");
 }
 
-async function testNodeId(id){
-  const r=await fetch(API+"/api/nodes/"+id+"/test").then(x=>x.json());
-  showAlert("n-alert",r.ok?`Node ${id} connected (${r.protocol||"ok"})`:`Node ${id} failed: ${r.error||"error"}`,r.ok?"ok":"err");
+async function openInboundModal(nodeId, niId){
+  editingInboundNodeId=nodeId;
+  editingNiId=niId;
+  document.getElementById("mi-title").textContent=niId?"Edit Sub-node":"Add Sub-node";
+  if(!niId){ document.getElementById("mi-name").value=""; document.getElementById("mi-inbound").value="1"; document.getElementById("mi-multiplier").value="1"; document.getElementById("mi-enabled").value="1"; }
+  else{
+    const inbounds=await fetch(API+"/api/nodes/"+nodeId+"/inbounds").then(r=>r.json());
+    const ni=inbounds.find(x=>x.id===niId);
+    if(ni){ document.getElementById("mi-name").value=ni.name||""; document.getElementById("mi-inbound").value=ni.inbound_id||1; document.getElementById("mi-multiplier").value=ni.traffic_multiplier||1; document.getElementById("mi-enabled").value=ni.enabled?1:0; }
+  }
+  document.getElementById("m-inbound").classList.add("open");
+}
+
+async function submitInbound(){
+  const mult=Math.max(1,parseFloat(document.getElementById("mi-multiplier").value)||1);
+  const body={inbound_id:parseInt(document.getElementById("mi-inbound").value)||1,name:document.getElementById("mi-name").value.trim()||null,traffic_multiplier:mult,enabled:parseInt(document.getElementById("mi-enabled").value)};
+  if(editingNiId){ await fetch(API+"/api/nodes/"+editingInboundNodeId+"/inbounds/"+editingNiId,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
+  else{ await fetch(API+"/api/nodes/"+editingInboundNodeId+"/inbounds",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
+  closeM("m-inbound"); loadNodes(); showAlert("n-alert","Sub-node saved","ok");
+}
+
+async function testInboundModal(){
+  if(!editingInboundNodeId){ showAlert("mi-alert","Save node first","err"); return; }
+  const inboundId=parseInt(document.getElementById("mi-inbound").value)||1;
+  const niId=editingNiId||0;
+  if(niId){
+    const r=await fetch(API+"/api/nodes/"+editingInboundNodeId+"/inbounds/"+niId+"/test").then(x=>x.json());
+    showAlert("mi-alert",r.ok?`Connected! Protocol: ${r.protocol||"ok"}`:`Failed: ${r.error||"error"}`,r.ok?"ok":"err");
+  } else {
+    const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
+    const n=nodes.find(x=>x.id===editingInboundNodeId);
+    if(!n){ showAlert("mi-alert","Node not found","err"); return; }
+    const r=await fetch(API+"/api/nodes/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({address:n.address,username:n.username,password:"",inbound_id:inboundId})}).then(x=>x.json());
+    showAlert("mi-alert",r.ok?`Inbound ${inboundId} ok (${r.protocol||"unknown"})`:`Failed: ${r.error||"error"}`,r.ok?"ok":"err");
+  }
+}
+
+async function testInbound(nodeId, niId){
+  const r=await fetch(API+"/api/nodes/"+nodeId+"/inbounds/"+niId+"/test").then(x=>x.json());
+  showAlert("n-alert",r.ok?`Sub-node ${niId} connected (${r.protocol||"ok"})`:`Sub-node ${niId} failed: ${r.error||"error"}`,r.ok?"ok":"err");
+}
+
+async function deleteInbound(nodeId, niId){
+  if(!confirm("Delete this sub-node? Subscriptions using it will lose this inbound.")) return;
+  await fetch(API+"/api/nodes/"+nodeId+"/inbounds/"+niId,{method:"DELETE"});
+  loadNodes(); showAlert("n-alert","Sub-node deleted","ok");
 }
 
 async function deleteNode(id){
-  if(!confirm("Delete this node?")) return;
+  if(!confirm("Delete this node and all its sub-nodes?")) return;
   await fetch(API+"/api/nodes/"+id,{method:"DELETE"});
   loadNodes(); showAlert("n-alert","Node deleted","ok");
 }

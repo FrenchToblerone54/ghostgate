@@ -18,7 +18,7 @@ def _conn():
     finally:
         c.close()
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 def init_db():
     with _conn() as c:
@@ -26,6 +26,8 @@ def init_db():
         has_tables = c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name IN ('nodes','subscriptions','subscription_nodes','access_logs') LIMIT 1").fetchone() is not None
         def _col_exists(table, col):
             return any(r[1] == col for r in c.execute(f"PRAGMA table_info({table})").fetchall())
+        def _tbl_exists(name):
+            return c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
         if user_ver == 0 and not has_tables:
             c.executescript("""
 CREATE TABLE nodes (
@@ -34,8 +36,15 @@ CREATE TABLE nodes (
     address TEXT NOT NULL,
     username TEXT NOT NULL,
     password TEXT NOT NULL,
-    inbound_id INTEGER NOT NULL,
     proxy_url TEXT,
+    enabled INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE node_inbounds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id INTEGER NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    inbound_id INTEGER NOT NULL,
+    name TEXT,
     traffic_multiplier REAL DEFAULT 1.0,
     enabled INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -61,7 +70,7 @@ CREATE TABLE subscription_nodes (
     client_disabled INTEGER DEFAULT 0,
     PRIMARY KEY (sub_id, node_id),
     FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+    FOREIGN KEY (node_id) REFERENCES node_inbounds(id) ON DELETE CASCADE
 );
 CREATE TABLE access_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,12 +141,52 @@ CREATE INDEX IF NOT EXISTS idx_al_sub ON access_logs(sub_id);
             if not _col_exists("subscriptions", "expire_after_first_use_seconds"):
                 c.execute("ALTER TABLE subscriptions ADD COLUMN expire_after_first_use_seconds INTEGER DEFAULT 0")
             c.execute("PRAGMA user_version=2")
+        if user_ver < 3:
+            c.execute("PRAGMA foreign_keys=OFF")
+            if not _tbl_exists("node_inbounds"):
+                c.execute("""CREATE TABLE node_inbounds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id INTEGER NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    inbound_id INTEGER NOT NULL,
+    name TEXT,
+    traffic_multiplier REAL DEFAULT 1.0,
+    enabled INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)""")
+            if _col_exists("nodes", "inbound_id"):
+                c.execute("""INSERT OR IGNORE INTO node_inbounds (id, node_id, inbound_id, name, traffic_multiplier, enabled, created_at)
+SELECT n.id,
+       (SELECT MIN(p.id) FROM nodes p WHERE p.address=n.address AND p.username=n.username AND p.password=n.password),
+       n.inbound_id, n.name, COALESCE(n.traffic_multiplier, 1.0), n.enabled, n.created_at
+FROM nodes n""")
+                c.execute("INSERT OR REPLACE INTO sqlite_sequence (name, seq) SELECT 'node_inbounds', COALESCE(MAX(id), 0) FROM node_inbounds")
+            if not _tbl_exists("subscription_nodes_v3"):
+                c.execute("""CREATE TABLE subscription_nodes_v3 (
+    sub_id TEXT NOT NULL,
+    node_id INTEGER NOT NULL,
+    client_uuid TEXT NOT NULL,
+    email TEXT NOT NULL,
+    client_disabled INTEGER DEFAULT 0,
+    PRIMARY KEY (sub_id, node_id),
+    FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
+    FOREIGN KEY (node_id) REFERENCES node_inbounds(id) ON DELETE CASCADE
+)""")
+            c.execute("INSERT OR IGNORE INTO subscription_nodes_v3 SELECT * FROM subscription_nodes")
+            c.execute("DROP TABLE IF EXISTS subscription_nodes")
+            c.execute("ALTER TABLE subscription_nodes_v3 RENAME TO subscription_nodes")
+            if _col_exists("nodes", "inbound_id"):
+                c.execute("DELETE FROM nodes WHERE id NOT IN (SELECT MIN(id) FROM nodes GROUP BY address, username, password)")
+                c.execute("ALTER TABLE nodes DROP COLUMN inbound_id")
+            if _col_exists("nodes", "traffic_multiplier"):
+                c.execute("ALTER TABLE nodes DROP COLUMN traffic_multiplier")
+            c.execute("PRAGMA foreign_keys=ON")
+            c.execute("PRAGMA user_version=3")
 
-def add_node(name, address, username, password, inbound_id, proxy_url=None, traffic_multiplier=1.0):
+def add_node(name, address, username, password, proxy_url=None):
     with _conn() as c:
         cur = c.execute(
-            "INSERT INTO nodes (name, address, username, password, inbound_id, proxy_url, traffic_multiplier) VALUES (?,?,?,?,?,?,?)",
-            (name, address, username, password, inbound_id, proxy_url, max(1.0, float(traffic_multiplier)))
+            "INSERT INTO nodes (name, address, username, password, proxy_url) VALUES (?,?,?,?,?)",
+            (name, address, username, password, proxy_url)
         )
         return cur.lastrowid
 
@@ -151,7 +200,7 @@ def get_node(node_id):
         return dict(r) if r else None
 
 def update_node(node_id, **kwargs):
-    allowed = {"name", "address", "username", "password", "inbound_id", "proxy_url", "enabled", "traffic_multiplier"}
+    allowed = {"name", "address", "username", "password", "proxy_url", "enabled"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
         return
@@ -162,6 +211,53 @@ def update_node(node_id, **kwargs):
 def delete_node(node_id):
     with _conn() as c:
         c.execute("DELETE FROM nodes WHERE id=?", (node_id,))
+
+def add_node_inbound(node_id, inbound_id, name=None, traffic_multiplier=1.0):
+    with _conn() as c:
+        cur = c.execute(
+            "INSERT INTO node_inbounds (node_id, inbound_id, name, traffic_multiplier) VALUES (?,?,?,?)",
+            (node_id, inbound_id, name, max(1.0, float(traffic_multiplier)))
+        )
+        return cur.lastrowid
+
+def get_node_inbounds(node_id):
+    with _conn() as c:
+        return [dict(r) for r in c.execute("SELECT * FROM node_inbounds WHERE node_id=? ORDER BY id", (node_id,))]
+
+def get_node_inbound(ni_id):
+    with _conn() as c:
+        r = c.execute("SELECT * FROM node_inbounds WHERE id=?", (ni_id,)).fetchone()
+        return dict(r) if r else None
+
+def get_node_inbound_with_node(ni_id):
+    with _conn() as c:
+        r = c.execute(
+            "SELECT ni.id, ni.node_id, ni.inbound_id, ni.name AS inbound_name, ni.traffic_multiplier, ni.enabled AS inbound_enabled, "
+            "n.name, n.address, n.username, n.password, n.proxy_url, n.enabled "
+            "FROM node_inbounds ni JOIN nodes n ON ni.node_id=n.id WHERE ni.id=?",
+            (ni_id,)
+        ).fetchone()
+        return dict(r) if r else None
+
+def get_all_node_inbounds():
+    with _conn() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT ni.*, n.name AS node_name, n.address, n.enabled AS node_enabled "
+            "FROM node_inbounds ni JOIN nodes n ON ni.node_id=n.id ORDER BY ni.id"
+        )]
+
+def update_node_inbound(ni_id, **kwargs):
+    allowed = {"inbound_id", "name", "traffic_multiplier", "enabled"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if not fields:
+        return
+    sets = ", ".join(f"{k}=?" for k in fields)
+    with _conn() as c:
+        c.execute(f"UPDATE node_inbounds SET {sets} WHERE id=?", (*fields.values(), ni_id))
+
+def delete_node_inbound(ni_id):
+    with _conn() as c:
+        c.execute("DELETE FROM node_inbounds WHERE id=?", (ni_id,))
 
 def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True, show_multiplier=1, expire_after_first_use_seconds=0):
     sub_id = sub_id or generate(size=20)
@@ -229,15 +325,25 @@ def add_sub_node(sub_id, node_id, client_uuid, email):
 def get_sub_nodes(sub_id):
     with _conn() as c:
         return [dict(r) for r in c.execute(
-            "SELECT sn.*, n.name, n.address, n.username, n.password, n.inbound_id, n.proxy_url "
-            "FROM subscription_nodes sn JOIN nodes n ON sn.node_id=n.id WHERE sn.sub_id=?", (sub_id,)
+            "SELECT sn.sub_id, sn.node_id, sn.client_uuid, sn.email, sn.client_disabled, "
+            "ni.inbound_id, ni.name AS inbound_name, ni.traffic_multiplier, "
+            "n.name, n.address, n.username, n.password, n.proxy_url, n.enabled "
+            "FROM subscription_nodes sn "
+            "JOIN node_inbounds ni ON sn.node_id=ni.id "
+            "JOIN nodes n ON ni.node_id=n.id "
+            "WHERE sn.sub_id=?", (sub_id,)
         )]
 
 def get_all_sub_nodes():
     with _conn() as c:
         return [dict(r) for r in c.execute(
-            "SELECT sn.*, n.name, n.address, n.username, n.password, n.inbound_id, n.proxy_url, n.enabled, n.traffic_multiplier "
-            "FROM subscription_nodes sn JOIN nodes n ON sn.node_id=n.id WHERE n.enabled=1"
+            "SELECT sn.sub_id, sn.node_id, sn.client_uuid, sn.email, sn.client_disabled, "
+            "ni.inbound_id, ni.name AS inbound_name, ni.traffic_multiplier, "
+            "n.name, n.address, n.username, n.password, n.proxy_url, n.enabled "
+            "FROM subscription_nodes sn "
+            "JOIN node_inbounds ni ON sn.node_id=ni.id "
+            "JOIN nodes n ON ni.node_id=n.id "
+            "WHERE ni.enabled=1 AND n.enabled=1"
         )]
 
 def remove_sub_node(sub_id, node_id):
@@ -267,7 +373,7 @@ def get_stats(sub_id):
         last = last_row[0] if last_row else None
         last_ua = last_row[1] if last_row else None
         nodes = c.execute(
-            "SELECT n.name FROM subscription_nodes sn JOIN nodes n ON sn.node_id=n.id WHERE sn.sub_id=?", (sub_id,)
+            "SELECT ni.name FROM subscription_nodes sn JOIN node_inbounds ni ON sn.node_id=ni.id WHERE sn.sub_id=?", (sub_id,)
         ).fetchall()
         return {**dict(sub), "access_count": count, "first_access": first, "last_access": last, "last_ua": last_ua, "nodes": [r[0] for r in nodes]}
 
@@ -279,7 +385,9 @@ def get_overview_stats():
             "SELECT COUNT(*) FROM subscriptions WHERE (expire_at IS NULL OR expire_at > ?) AND (data_gb=0 OR used_bytes < data_gb*1073741824)",
             (now,)
         ).fetchone()[0]
-        nodes = c.execute("SELECT COUNT(*) FROM nodes WHERE enabled=1").fetchone()[0]
+        nodes = c.execute(
+            "SELECT COUNT(*) FROM node_inbounds ni JOIN nodes n ON ni.node_id=n.id WHERE ni.enabled=1 AND n.enabled=1"
+        ).fetchone()[0]
         recent = c.execute("SELECT sub_id, accessed_at FROM access_logs ORDER BY accessed_at DESC LIMIT 10").fetchall()
         return {"total_subs": total, "active_subs": active, "nodes": nodes, "recent": [dict(r) for r in recent]}
 

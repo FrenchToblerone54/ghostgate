@@ -169,20 +169,17 @@ def cmd_nodes(args):
     if not nodes:
         console.print(f"[{MUTED}]No nodes configured.[/]")
         return
-    tbl = Table(box=box.ROUNDED, border_style=DIM, header_style=f"bold {MUTED}")
-    tbl.add_column("#", style=MUTED)
-    tbl.add_column("Name", style="bold white")
-    tbl.add_column("Address", style=f"{BLUE}")
-    tbl.add_column("Inbound", style=MUTED)
-    tbl.add_column("Proxy", style=MUTED)
-    tbl.add_column("×Mult", style=WARN)
-    tbl.add_column("Status")
+    lines = []
     for n in nodes:
-        status = Text("● Enabled", style=ACC) if n.get("enabled") else Text("● Disabled", style=DANGER)
-        mult = n.get("traffic_multiplier") or 1.0
-        tbl.add_row(str(n["id"]), n["name"], n["address"], str(n["inbound_id"]),
-            "Proxy" if n.get("proxy_url") else "—", f"×{mult:g}" if mult != 1.0 else "—", status)
-    console.print(Panel(tbl, title=f"[bold white]Nodes[/]", border_style=DIM, padding=(0, 1)))
+        status_text = f"[{ACC}]● On[/]" if n.get("enabled") else f"[{DANGER}]● Off[/]"
+        proxy_text = f"  [{MUTED}]Proxy: {n['proxy_url']}[/]" if n.get("proxy_url") else ""
+        lines.append(f"[bold white][{n['id']}] {n['name']}[/]  [{BLUE}]{n['address']}[/]  {status_text}{proxy_text}")
+        for ni in db.get_node_inbounds(n["id"]):
+            ni_status = f"[{ACC}]On[/]" if ni.get("enabled") else f"[{DANGER}]Off[/]"
+            mult = ni.get("traffic_multiplier") or 1.0
+            mult_str = f"  [{WARN}]×{mult:g}[/]" if mult != 1.0 else ""
+            lines.append(f"  [{DIM}]└─[/] [{MUTED}][{ni['id']}][/] {ni['name'] or 'Inbound '+str(ni['inbound_id'])}  [{MUTED}]ID:{ni['inbound_id']}[/]{mult_str}  {ni_status}")
+    console.print(Panel("\n".join(lines), title=f"[bold white]Nodes[/]", border_style=DIM, padding=(0, 1)))
 
 def cmd_status(args):
     subs, total = db.get_subs(page=1, per_page=0)
@@ -190,7 +187,7 @@ def cmd_status(args):
     active = sum(1 for s in subs if s.get("enabled") != 0
         and not (s.get("expire_at") and datetime.fromisoformat(s["expire_at"]).replace(tzinfo=timezone.utc) < now)
         and not (s.get("data_gb", 0) > 0 and (s.get("used_bytes") or 0) >= int(s["data_gb"]*1073741824)))
-    nodes = db.get_nodes()
+    inbounds = db.get_all_node_inbounds()
     cpu = psutil.cpu_percent(interval=0.3)
     ram = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
@@ -206,7 +203,7 @@ def cmd_status(args):
         f"  [{MUTED}]Disk[/]      {_bar(disk.percent)}  [{MUTED}]{disk.used/1073741824:.1f} GB / {disk.total/1073741824:.1f} GB[/]",
         f"  [{MUTED}]Load[/]      [{MUTED}]{load[0]:.2f}  {load[1]:.2f}  {load[2]:.2f}[/]",
         f"  [{MUTED}]Subs[/]      [{ACC}]{active}[/] [{MUTED}]active / {total} total[/]",
-        f"  [{MUTED}]Nodes[/]     [{MUTED}]{len(nodes)}[/]",
+        f"  [{MUTED}]Sub-nodes[/] [{MUTED}]{len(inbounds)}[/]",
     ]
     console.print(Panel("\n".join(lines), title=f"[bold white]GhostGate[/]", border_style=DIM, padding=(0, 1)))
 
@@ -222,9 +219,9 @@ def cmd_create(args):
     ip_limit = int(opts.get("ip", 0))
     show_multiplier = max(1, int(opts.get("show-multiplier", 1)))
     node_ids_raw = opts.get("nodes", "")
-    all_nodes = db.get_nodes()
+    all_inbounds = db.get_all_node_inbounds()
     if node_ids_raw == "all":
-        node_ids = [n["id"] for n in all_nodes]
+        node_ids = [ni["id"] for ni in all_inbounds]
     elif node_ids_raw == "none" or not node_ids_raw:
         node_ids = []
     else:
@@ -243,18 +240,18 @@ def cmd_create(args):
     expiry_time = -expire_after_first_use_seconds*1000 if expire_after_first_use_seconds>0 and not sub.get("expire_at") else expire_ms
     errors = []
     for node_id in node_ids:
-        node = db.get_node(node_id)
-        if not node: continue
+        ni = db.get_node_inbound_with_node(node_id)
+        if not ni: continue
         try:
-            xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
-            total_limit_bytes = int(data_gb * 1073741824 / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
+            xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+            total_limit_bytes = int(data_gb * 1073741824 / (ni.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
             email = f"{sub_id}-{node_id}"
             client = xui.make_client(email, client_uuid, expiry_time, ip_limit, sub_id, comment, total_limit_bytes)
-            ok = xui.add_client(node["inbound_id"], client)
+            ok = xui.add_client(ni["inbound_id"], client)
             if ok: db.add_sub_node(sub_id, node_id, client_uuid, email)
-            else: errors.append(f"node {node_id}: failed")
+            else: errors.append(f"inbound {node_id}: failed")
         except Exception as e:
-            errors.append(f"node {node_id}: {e}")
+            errors.append(f"inbound {node_id}: {e}")
     base_url = os.getenv("BASE_URL", "").rstrip("/")
     sub_url = f"{base_url}/sub/{sub_id}" if base_url else f"/sub/{sub_id}"
     lines = [

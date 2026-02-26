@@ -86,12 +86,12 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ip_limit = int(opts.get("ip", 0))
     show_multiplier = max(1, int(opts.get("show-multiplier", 1)))
     nodes_str = opts.get("nodes", "all")
-    all_nodes = db.get_nodes()
-    if not all_nodes:
-        await update.message.reply_text("No nodes configured. Add nodes via the web panel first.")
+    all_inbounds = db.get_all_node_inbounds()
+    if not all_inbounds:
+        await update.message.reply_text("No sub-nodes configured. Add nodes and sub-nodes via the web panel first.")
         return
     if nodes_str == "all":
-        node_ids = [n["id"] for n in all_nodes if n["enabled"]]
+        node_ids = [ni["id"] for ni in all_inbounds if ni.get("enabled") and ni.get("node_enabled")]
     elif nodes_str == "none":
         node_ids = []
     else:
@@ -108,19 +108,19 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     expiry_time = -expire_after_first_use_seconds*1000 if expire_after_first_use_seconds>0 and not sub.get("expire_at") else expire_ms
     added_nodes = []
     for node_id in node_ids:
-        node = db.get_node(node_id)
-        if not node:
+        ni = db.get_node_inbound_with_node(node_id)
+        if not ni:
             continue
         try:
-            xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
-            total_limit_bytes = int(data_gb * 1073741824 / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
+            xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+            total_limit_bytes = int(data_gb * 1073741824 / (ni.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
             email = f"{sub_id}-{node_id}"
             client = xui.make_client(email, client_uuid, expiry_time, ip_limit, sub_id, comment or "", total_limit_bytes)
-            if xui.add_client(node["inbound_id"], client):
+            if xui.add_client(ni["inbound_id"], client):
                 db.add_sub_node(sub_id, node_id, client_uuid, email)
-                added_nodes.append(node["name"])
+                added_nodes.append(ni.get("inbound_name") or ni["name"])
         except Exception as e:
-            logger.warning(f"create sub node {node_id} error: {e}")
+            logger.warning(f"create sub inbound {node_id} error: {e}")
     sub_link = _sub_url(sub_id)
     expire_str = sub["expire_at"][:10] if sub.get("expire_at") else "Never"
     data_str = f"{data_gb} GB" if data_gb > 0 else "Unlimited"
@@ -283,9 +283,10 @@ async def cmd_addnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not all([name, addr, user, pwd]):
         await update.message.reply_text("Usage: /addnode --name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...] [--multiplier N]")
         return
-    node_id = db.add_node(name, addr, user, pwd, inbound, proxy, multiplier)
+    node_id = db.add_node(name, addr, user, pwd, proxy)
+    ni_id = db.add_node_inbound(node_id, inbound, name, multiplier)
     mult_str = f" ×{multiplier:g}" if multiplier != 1.0 else ""
-    await update.message.reply_text(f"Node added: [{node_id}] {name}{mult_str}\n{addr} — inbound {inbound}")
+    await update.message.reply_text(f"Node added: [{node_id}] {name}{mult_str}\n{addr} — sub-node [{ni_id}] inbound {inbound}")
 
 async def cmd_delnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update.effective_user.id):
@@ -314,10 +315,13 @@ async def cmd_nodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     lines = ["Nodes:\n"]
     for n in nodes:
-        status = "enabled" if n["enabled"] else "disabled"
-        mult = n.get("traffic_multiplier") or 1.0
-        mult_str = f" ×{mult:g}" if mult != 1.0 else ""
-        lines.append(f"[{n['id']}] {n['name']} - {n['address']} - inbound:{n['inbound_id']}{mult_str} - {status}")
+        status = "on" if n["enabled"] else "off"
+        lines.append(f"[{n['id']}] {n['name']} — {n['address']} ({status})")
+        for ni in db.get_node_inbounds(n["id"]):
+            ni_status = "on" if ni["enabled"] else "off"
+            mult = ni.get("traffic_multiplier") or 1.0
+            mult_str = f" ×{mult:g}" if mult != 1.0 else ""
+            lines.append(f"  └─ [{ni['id']}] {ni['name'] or 'Inbound '+str(ni['inbound_id'])} — ID:{ni['inbound_id']}{mult_str} ({ni_status})")
     await update.message.reply_text("\n".join(lines))
 
 async def _error_handler(update, ctx):
