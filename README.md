@@ -284,6 +284,10 @@ Or using Docker (recommended for Ubuntu 22.04 GLIBC compatibility):
 
 Binary will be created in `dist/`.
 
+## Community
+
+Join the Telegram channel for updates and announcements: [@GhostSoftDev](https://t.me/GhostSoftDev)
+
 ## License
 
 MIT License - See LICENSE file for details

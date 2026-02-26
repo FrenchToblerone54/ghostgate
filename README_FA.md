@@ -292,6 +292,10 @@ pip install -r requirements.txt pyinstaller
 
 فایل باینری در پوشه `dist/` ایجاد می‌شود.
 
+## کانال تلگرام
+
+برای دریافت به‌روزرسانی‌ها و اطلاعیه‌ها به کانال تلگرام بپیوندید: [@GhostSoftDev](https://t.me/GhostSoftDev)
+
 ## مجوز
 
 MIT License - جزئیات در فایل LICENSE
