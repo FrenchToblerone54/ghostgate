@@ -178,6 +178,13 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .nsub-acts{display:flex;gap:5px;flex-shrink:0}
 .nadd-sub{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-sm);border:1px dashed var(--border);color:var(--text3);font-size:0.78em;font-weight:600;cursor:pointer;background:none;font-family:'Outfit',sans-serif;transition:all 0.15s;width:100%;margin-top:4px}
 .nadd-sub:hover{border-color:var(--accent-border);color:var(--accent)}
+.nparent[draggable="true"] .nparent-hd{cursor:grab}
+.nparent[draggable="true"] .nparent-hd:active{cursor:grabbing}
+.nparent.dragging{opacity:0.5}
+.nparent.drag-over{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.nsub-row[draggable="true"]{cursor:grab}
+.nsub-row.dragging{opacity:0.5}
+.nsub-row.drag-over{border-color:var(--accent)}
 .detail-qr{display:block;margin:0 auto;max-width:190px;border-radius:8px;background:#0a0f1a;padding:10px}
 .detail-url{display:flex;align-items:center;gap:0;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:14px}
 .detail-url code{flex:1;padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:0.75em;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1019,6 +1026,28 @@ function _initNodeOrderDrag(){
   });
 }
 
+function _initNodeTreeDrag(){
+  const tree=document.getElementById("n-tree");
+  let srcNode=null,srcNi=null;
+  tree.querySelectorAll(".nparent[data-node-id]").forEach(item=>{
+    item.addEventListener("dragstart",e=>{if(e.target.closest("button,.nsubs")) return e.preventDefault();srcNode=item;srcNi=null;item.classList.add("dragging");e.dataTransfer.effectAllowed="move";});
+    item.addEventListener("dragend",()=>{srcNode=null;tree.querySelectorAll(".nparent").forEach(i=>i.classList.remove("dragging","drag-over"));const ids=[...tree.querySelectorAll(".nparent[data-node-id]")].map(el=>parseInt(el.dataset.nodeId));fetch(API+"/api/nodes/reorder",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({node_ids:ids})});});
+    item.addEventListener("dragover",e=>{if(srcNode&&!e.target.closest(".nsubs")){e.preventDefault();item.classList.add("drag-over");}});
+    item.addEventListener("dragleave",e=>{if(!item.contains(e.relatedTarget))item.classList.remove("drag-over");});
+    item.addEventListener("drop",e=>{if(srcNode&&item!==srcNode&&!e.target.closest(".nsubs")){e.preventDefault();const rect=item.getBoundingClientRect();if(e.clientY<rect.top+rect.height/2)tree.insertBefore(srcNode,item);else tree.insertBefore(srcNode,item.nextSibling);item.classList.remove("drag-over");}});
+  });
+  tree.querySelectorAll(".nsubs[data-node-id]").forEach(container=>{
+    const nodeId=parseInt(container.dataset.nodeId);
+    container.querySelectorAll(".nsub-row[data-ni-id]").forEach(item=>{
+      item.addEventListener("dragstart",e=>{e.stopPropagation();if(e.target.closest("button")) return e.preventDefault();srcNi=item;srcNode=null;item.classList.add("dragging");e.dataTransfer.effectAllowed="move";});
+      item.addEventListener("dragend",()=>{srcNi=null;container.querySelectorAll(".nsub-row").forEach(i=>i.classList.remove("dragging","drag-over"));const ids=[...container.querySelectorAll(".nsub-row[data-ni-id]")].map(el=>parseInt(el.dataset.niId));fetch(API+"/api/nodes/"+nodeId+"/inbounds/reorder",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({ni_ids:ids})});});
+      item.addEventListener("dragover",e=>{if(srcNi){e.preventDefault();e.stopPropagation();item.classList.add("drag-over");}});
+      item.addEventListener("dragleave",()=>item.classList.remove("drag-over"));
+      item.addEventListener("drop",e=>{if(srcNi&&item!==srcNi){e.preventDefault();e.stopPropagation();const rect=item.getBoundingClientRect();if(e.clientY<rect.top+rect.height/2)container.insertBefore(srcNi,item);else container.insertBefore(srcNi,item.nextSibling);item.classList.remove("drag-over");}});
+    });
+  });
+}
+
 async function loadNodes(){
   const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
   const tree=document.getElementById("n-tree");
@@ -1026,7 +1055,7 @@ async function loadNodes(){
   tree.innerHTML=nodes.map(n=>{
     const inbounds=(n.inbounds||[]);
     const subnodes=inbounds.map(ni=>`
-<div class="nsub-row">
+<div class="nsub-row" draggable="true" data-ni-id="${ni.id}">
 <span class="nsub-connector">└─</span>
 <div class="nsub-info"><div class="nsub-name">${ni.name||"Inbound "+ni.inbound_id}</div><div class="nsub-id">Inbound ID: ${ni.inbound_id}${ni.traffic_multiplier&&ni.traffic_multiplier!=1?" · ×"+ni.traffic_multiplier:""}</div></div>
 <span class="badge ${ni.enabled?"badge-green":"badge-red"}" style="font-size:0.7em;flex-shrink:0">${ni.enabled?"On":"Off"}</span>
@@ -1036,7 +1065,7 @@ async function loadNodes(){
 <button class="btn btn-danger btn-sm" onclick="deleteInbound(${n.id},${ni.id})">Del</button>
 </div>
 </div>`).join("");
-    return `<div class="nparent">
+    return `<div class="nparent" draggable="true" data-node-id="${n.id}">
 <div class="nparent-hd">
 <div class="nparent-info"><div class="nparent-name">${n.name}</div><div class="nparent-addr">${n.address}${n.proxy_url?" · <span style='color:var(--blue)'>Proxy</span>":""}</div></div>
 <span class="badge ${n.enabled?"badge-green":"badge-red"}" style="font-size:0.7em;flex-shrink:0">${n.enabled?"On":"Off"}</span>
@@ -1045,9 +1074,10 @@ async function loadNodes(){
 <button class="btn btn-danger btn-sm" onclick="deleteNode(${n.id})">Del</button>
 </div>
 </div>
-<div class="nsubs">${subnodes}<button class="nadd-sub" onclick="openInboundModal(${n.id},null)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Sub-node</button></div>
+<div class="nsubs" data-node-id="${n.id}">${subnodes}<button class="nadd-sub" onclick="openInboundModal(${n.id},null)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Sub-node</button></div>
 </div>`;
   }).join("");
+  _initNodeTreeDrag();
 }
 
 async function openNodeModal(id){

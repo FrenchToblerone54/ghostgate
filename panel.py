@@ -107,6 +107,33 @@ def _fmt_vless(client_uuid, label, server, port, stream_settings, security):
     query = "&".join(f"{k}={quote(str(v))}" for k, v in params.items())
     return f"vless://{client_uuid}@{server}:{port}?{query}#{quote(label)}"
 
+def _fmt_vmess(client_uuid, label, server, port, stream_settings, security):
+    net = stream_settings.get("network", "tcp")
+    ws_s = stream_settings.get("wsSettings", {})
+    grpc_s = stream_settings.get("grpcSettings", {})
+    tcp_s = stream_settings.get("tcpSettings", {})
+    hu_s = stream_settings.get("httpupgradeSettings", {})
+    xhttp_s = stream_settings.get("xhttpSettings", {})
+    tls_s = stream_settings.get("tlsSettings", {})
+    obj = {"v": "2", "ps": label, "add": server, "port": port, "id": client_uuid, "aid": 0, "scy": "auto", "net": net, "type": "none", "host": "", "path": "", "tls": "tls" if security == "tls" else "none", "sni": tls_s.get("serverName", ""), "alpn": ",".join(tls_s.get("alpn", [])), "fp": tls_s.get("fingerprint", "")}
+    if net == "ws":
+        obj["path"] = ws_s.get("path", "/")
+        obj["host"] = ws_s.get("headers", {}).get("Host", "")
+    elif net == "grpc":
+        obj["path"] = grpc_s.get("serviceName", "")
+        obj["type"] = "gun"
+    elif net == "tcp":
+        htype = tcp_s.get("header", {}).get("type", "none")
+        obj["type"] = htype
+        if htype != "none":
+            obj["path"] = (tcp_s.get("header", {}).get("request", {}).get("path") or ["/"])[0]
+            obj["host"] = (tcp_s.get("header", {}).get("request", {}).get("headers", {}).get("Host") or [""])[0]
+    elif net in ("httpupgrade", "xhttp"):
+        s = hu_s if net == "httpupgrade" else xhttp_s
+        obj["path"] = s.get("path", "/")
+        obj["host"] = s.get("host", "")
+    return "vmess://" + base64.b64encode(json.dumps(obj, separators=(",", ":")).encode()).decode()
+
 def _make_qr_b64(text):
     qr = qrcode.QRCode(box_size=6, border=2)
     qr.add_data(text)
@@ -174,10 +201,12 @@ def sub_page(sub_id):
             if not inbound:
                 continue
             stream = json.loads(inbound.get("streamSettings", "{}"))
+            proto = inbound.get("protocol", "vless").lower()
             orig_security = stream.get("security", "none")
             orig_port = inbound.get("port", 443)
             raw_addr = sn["address"].split("//")[-1].split("/")[0]
             orig_server = raw_addr.split(":")[0]
+            _fmt = _fmt_vmess if proto == "vmess" else _fmt_vless
             ext_proxies = stream.get("externalProxy") or []
             if ext_proxies:
                 for i, ep in enumerate(ext_proxies):
@@ -188,9 +217,9 @@ def sub_page(sub_id):
                     ep_stream = dict(stream)
                     ep_stream["security"] = ep_security
                     label = f"{sn.get('inbound_name') or sn['name']}-{i+1}" if i > 0 else (sn.get("inbound_name") or sn["name"])
-                    configs.append(_fmt_vless(sn["client_uuid"], label, ep_server, ep_port, ep_stream, ep_security))
+                    configs.append(_fmt(sn["client_uuid"], label, ep_server, ep_port, ep_stream, ep_security))
             else:
-                configs.append(_fmt_vless(sn["client_uuid"], sn.get("inbound_name") or sn["name"], orig_server, orig_port, stream, orig_security))
+                configs.append(_fmt(sn["client_uuid"], sn.get("inbound_name") or sn["name"], orig_server, orig_port, stream, orig_security))
         except Exception:
             pass
     profile_title = os.getenv("PROFILE_TITLE", "GhostGate Subscription")
@@ -631,6 +660,12 @@ def register_routes(panel_path):
             n["inbounds"] = db.get_node_inbounds(n["id"])
         return jsonify(nodes)
 
+    @app.route(f"/{panel_path}/api/nodes/reorder", methods=["PUT"])
+    def api_nodes_reorder():
+        node_ids = [int(n) for n in request.json.get("node_ids", [])]
+        db.reorder_nodes(node_ids)
+        return jsonify({"ok": True})
+
     @app.route(f"/{panel_path}/api/nodes", methods=["POST"])
     def api_nodes_create():
         data = request.json
@@ -651,6 +686,12 @@ def register_routes(panel_path):
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds")
     def api_node_inbounds_list(node_id):
         return jsonify(db.get_node_inbounds(node_id))
+
+    @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds/reorder", methods=["PUT"])
+    def api_node_inbounds_reorder(node_id):
+        ni_ids = [int(n) for n in request.json.get("ni_ids", [])]
+        db.reorder_node_inbounds(node_id, ni_ids)
+        return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds", methods=["POST"])
     def api_node_inbound_create(node_id):

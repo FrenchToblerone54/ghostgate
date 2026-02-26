@@ -10,7 +10,7 @@ GhostGate is a sales and subscription management panel for [3x-ui](https://githu
 - **Telegram bot** - Create, edit, delete, and monitor subscriptions via bot commands
 - **Web admin panel** - Real-time system monitoring, subscription management, node management, logs
 - **Auto sync** - Background worker syncs traffic usage and enforces data/expiry limits
-- **Subscription links** - Standard VLESS subscription URLs with QR codes
+- **Subscription links** - Standard VLESS and VMess subscription URLs with QR codes
 - **External proxy support** - Respects 3x-ui external proxy configurations for CDN setups
 - **Compiled binary** - Linux amd64 (Ubuntu 22.04+ compatible), no Python required on server
 - **systemd service** - Automated start, restart, logging
@@ -195,7 +195,7 @@ The end-user subscription URL is public and requires no authentication:
 https://your-domain.com/sub/<id>
 ```
 
-This returns a base64-encoded VLESS config list compatible with standard VPN clients.
+This returns a base64-encoded config list (VLESS and VMess) compatible with standard VPN clients.
 
 ## nginx Configuration
 

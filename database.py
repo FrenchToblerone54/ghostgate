@@ -18,7 +18,7 @@ def _conn():
     finally:
         c.close()
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 def init_db():
     with _conn() as c:
@@ -38,6 +38,7 @@ CREATE TABLE nodes (
     password TEXT NOT NULL,
     proxy_url TEXT,
     enabled INTEGER DEFAULT 1,
+    "order" INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE node_inbounds (
@@ -47,6 +48,7 @@ CREATE TABLE node_inbounds (
     name TEXT,
     traffic_multiplier REAL DEFAULT 1.0,
     enabled INTEGER DEFAULT 1,
+    "order" INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE subscriptions (
@@ -187,18 +189,27 @@ FROM nodes n""")
                 c.execute('ALTER TABLE subscription_nodes ADD COLUMN "order" INTEGER DEFAULT 0')
                 c.execute('UPDATE subscription_nodes SET "order" = node_id')
             c.execute("PRAGMA user_version=4")
+        if user_ver < 5:
+            if not _col_exists("nodes", "order"):
+                c.execute('ALTER TABLE nodes ADD COLUMN "order" INTEGER DEFAULT 0')
+                c.execute('UPDATE nodes SET "order" = id')
+            if not _col_exists("node_inbounds", "order"):
+                c.execute('ALTER TABLE node_inbounds ADD COLUMN "order" INTEGER DEFAULT 0')
+                c.execute('UPDATE node_inbounds SET "order" = id')
+            c.execute("PRAGMA user_version=5")
 
 def add_node(name, address, username, password, proxy_url=None):
     with _conn() as c:
+        cnt = c.execute("SELECT COUNT(*) FROM nodes").fetchone()[0]
         cur = c.execute(
-            "INSERT INTO nodes (name, address, username, password, proxy_url) VALUES (?,?,?,?,?)",
-            (name, address, username, password, proxy_url)
+            'INSERT INTO nodes (name, address, username, password, proxy_url, "order") VALUES (?,?,?,?,?,?)',
+            (name, address, username, password, proxy_url, cnt)
         )
         return cur.lastrowid
 
 def get_nodes():
     with _conn() as c:
-        return [dict(r) for r in c.execute("SELECT * FROM nodes ORDER BY id")]
+        return [dict(r) for r in c.execute('SELECT * FROM nodes ORDER BY "order", id')]
 
 def get_node(node_id):
     with _conn() as c:
@@ -220,15 +231,16 @@ def delete_node(node_id):
 
 def add_node_inbound(node_id, inbound_id, name=None, traffic_multiplier=1.0):
     with _conn() as c:
+        cnt = c.execute("SELECT COUNT(*) FROM node_inbounds WHERE node_id=?", (node_id,)).fetchone()[0]
         cur = c.execute(
-            "INSERT INTO node_inbounds (node_id, inbound_id, name, traffic_multiplier) VALUES (?,?,?,?)",
-            (node_id, inbound_id, name, max(1.0, float(traffic_multiplier)))
+            'INSERT INTO node_inbounds (node_id, inbound_id, name, traffic_multiplier, "order") VALUES (?,?,?,?,?)',
+            (node_id, inbound_id, name, max(1.0, float(traffic_multiplier)), cnt)
         )
         return cur.lastrowid
 
 def get_node_inbounds(node_id):
     with _conn() as c:
-        return [dict(r) for r in c.execute("SELECT * FROM node_inbounds WHERE node_id=? ORDER BY id", (node_id,))]
+        return [dict(r) for r in c.execute('SELECT * FROM node_inbounds WHERE node_id=? ORDER BY "order", id', (node_id,))]
 
 def get_node_inbound(ni_id):
     with _conn() as c:
@@ -369,6 +381,16 @@ def reorder_sub_nodes(sub_id, node_ids):
     with _conn() as c:
         for i, nid in enumerate(node_ids):
             c.execute('UPDATE subscription_nodes SET "order"=? WHERE sub_id=? AND node_id=?', (i, sub_id, nid))
+
+def reorder_nodes(node_ids):
+    with _conn() as c:
+        for i, nid in enumerate(node_ids):
+            c.execute('UPDATE nodes SET "order"=? WHERE id=?', (i, nid))
+
+def reorder_node_inbounds(node_id, ni_ids):
+    with _conn() as c:
+        for i, nid in enumerate(ni_ids):
+            c.execute('UPDATE node_inbounds SET "order"=? WHERE id=? AND node_id=?', (i, nid, node_id))
 
 def log_access(sub_id, ip_address=None, user_agent=None):
     with _conn() as c:
