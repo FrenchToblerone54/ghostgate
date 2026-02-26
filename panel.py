@@ -187,10 +187,10 @@ def sub_page(sub_id):
                     ep_security = orig_security if force_tls == "same" else force_tls
                     ep_stream = dict(stream)
                     ep_stream["security"] = ep_security
-                    label = f"{sn['name']}-{i+1}" if i > 0 else sn["name"]
+                    label = f"{sn.get('inbound_name') or sn['name']}-{i+1}" if i > 0 else (sn.get("inbound_name") or sn["name"])
                     configs.append(_fmt_vless(sn["client_uuid"], label, ep_server, ep_port, ep_stream, ep_security))
             else:
-                configs.append(_fmt_vless(sn["client_uuid"], sn["name"], orig_server, orig_port, stream, orig_security))
+                configs.append(_fmt_vless(sn["client_uuid"], sn.get("inbound_name") or sn["name"], orig_server, orig_port, stream, orig_security))
         except Exception:
             pass
     profile_title = os.getenv("PROFILE_TITLE", "GhostGate Subscription")
@@ -447,6 +447,12 @@ def register_routes(panel_path):
             except Exception as e:
                 errors.append(f"inbound {node_id}: {e}")
         return jsonify({"ok": True, "errors": errors})
+
+    @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/nodes/reorder", methods=["PUT"])
+    def api_sub_reorder_nodes(sub_id):
+        node_ids = [int(n) for n in request.json.get("node_ids", [])]
+        db.reorder_sub_nodes(sub_id, node_ids)
+        return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/nodes/<int:node_id>", methods=["DELETE"])
     def api_sub_remove_node(sub_id, node_id):

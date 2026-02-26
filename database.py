@@ -18,7 +18,7 @@ def _conn():
     finally:
         c.close()
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 def init_db():
     with _conn() as c:
@@ -68,6 +68,7 @@ CREATE TABLE subscription_nodes (
     client_uuid TEXT NOT NULL,
     email TEXT NOT NULL,
     client_disabled INTEGER DEFAULT 0,
+    "order" INTEGER DEFAULT 0,
     PRIMARY KEY (sub_id, node_id),
     FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
     FOREIGN KEY (node_id) REFERENCES node_inbounds(id) ON DELETE CASCADE
@@ -181,6 +182,11 @@ FROM nodes n""")
                 c.execute("ALTER TABLE nodes DROP COLUMN traffic_multiplier")
             c.execute("PRAGMA foreign_keys=ON")
             c.execute("PRAGMA user_version=3")
+        if user_ver < 4:
+            if not _col_exists("subscription_nodes", "order"):
+                c.execute('ALTER TABLE subscription_nodes ADD COLUMN "order" INTEGER DEFAULT 0')
+                c.execute('UPDATE subscription_nodes SET "order" = node_id')
+            c.execute("PRAGMA user_version=4")
 
 def add_node(name, address, username, password, proxy_url=None):
     with _conn() as c:
@@ -317,9 +323,10 @@ def delete_sub(sub_id):
 
 def add_sub_node(sub_id, node_id, client_uuid, email):
     with _conn() as c:
+        cnt = c.execute("SELECT COUNT(*) FROM subscription_nodes WHERE sub_id=?", (sub_id,)).fetchone()[0]
         c.execute(
-            "INSERT OR REPLACE INTO subscription_nodes (sub_id, node_id, client_uuid, email) VALUES (?,?,?,?)",
-            (sub_id, node_id, client_uuid, email)
+            'INSERT OR REPLACE INTO subscription_nodes (sub_id, node_id, client_uuid, email, "order") VALUES (?,?,?,?,?)',
+            (sub_id, node_id, client_uuid, email, cnt)
         )
 
 def get_sub_nodes(sub_id):
@@ -331,7 +338,7 @@ def get_sub_nodes(sub_id):
             "FROM subscription_nodes sn "
             "JOIN node_inbounds ni ON sn.node_id=ni.id "
             "JOIN nodes n ON ni.node_id=n.id "
-            "WHERE sn.sub_id=?", (sub_id,)
+            'WHERE sn.sub_id=? ORDER BY sn."order", sn.node_id', (sub_id,)
         )]
 
 def get_all_sub_nodes():
@@ -343,7 +350,7 @@ def get_all_sub_nodes():
             "FROM subscription_nodes sn "
             "JOIN node_inbounds ni ON sn.node_id=ni.id "
             "JOIN nodes n ON ni.node_id=n.id "
-            "WHERE ni.enabled=1 AND n.enabled=1"
+            'WHERE ni.enabled=1 AND n.enabled=1 ORDER BY sn."order", sn.node_id'
         )]
 
 def remove_sub_node(sub_id, node_id):
@@ -357,6 +364,11 @@ def set_sub_node_disabled(sub_id, node_id, disabled):
 def reset_sub_node_disabled(sub_id):
     with _conn() as c:
         c.execute("UPDATE subscription_nodes SET client_disabled=0 WHERE sub_id=?", (sub_id,))
+
+def reorder_sub_nodes(sub_id, node_ids):
+    with _conn() as c:
+        for i, nid in enumerate(node_ids):
+            c.execute('UPDATE subscription_nodes SET "order"=? WHERE sub_id=? AND node_id=?', (i, sub_id, nid))
 
 def log_access(sub_id, ip_address=None, user_agent=None):
     with _conn() as c:

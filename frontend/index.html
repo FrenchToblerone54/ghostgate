@@ -157,6 +157,11 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .node-item label{cursor:pointer;flex:1}
 .node-item-name{font-size:0.86em;font-weight:700;color:var(--text)}
 .node-item-addr{font-size:0.74em;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.node-order-list{display:flex;flex-direction:column;gap:3px;margin-bottom:6px}
+.node-order-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card2);cursor:grab;user-select:none;font-size:0.84em;font-weight:600}
+.node-order-item:active{cursor:grabbing}
+.node-order-item.dragging{opacity:0.4;border-style:dashed}
+.node-order-item.drag-over{border-color:var(--accent)}
 .ntree{display:flex;flex-direction:column;gap:10px;padding:16px}
 .nparent{background:var(--card2);border:1px solid var(--border);border-radius:var(--radius)}
 .nparent-hd{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
@@ -505,7 +510,7 @@ Refresh
 <div style="display:flex;gap:8px"><button id="me-no-expire-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoExpire()">Set No Expiry</button><button id="me-no-limit-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoDataLimit()">Set No Data Limit</button></div>
 <div class="fg"><label class="fl">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="me-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
-<div class="fg"><label class="fl">Nodes</label><div class="nodes-list" id="me-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading...</div></div></div>
+<div class="fg"><label class="fl">Node Order</label><div id="me-node-order"></div><label class="fl" style="margin-top:6px">Add / Remove Nodes</label><div class="nodes-list" id="me-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading...</div></div></div>
 </div>
 <div class="modal-ft">
 <button class="btn btn-ghost" onclick="closeM('m-edit')">Cancel</button>
@@ -570,7 +575,7 @@ Refresh
 <script>
 const API="{{prefix}}";
 let sPage=1,sTotalPages=1,sSearch="",sTimer=null,sPerPage=20;
-let editingSubId=null,editingNodeId=null,editingNiId=null,editingInboundNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set();
+let editingSubId=null,editingNodeId=null,editingNiId=null,editingInboundNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set(),_nodeOrder=[];
 let logStream=null,liveLog=false;
 let subsStream=null;
 let prevNet={sent:0,recv:0,t:0};
@@ -793,7 +798,7 @@ async function viewSub(id){
   const expStr=sub.expire_at?sub.expire_at.substring(0,16):(firstuseSec>0?`${firstuseDays} days after 1st use`:"Never");
   const usedExact=`${(sub.used_bytes||0).toLocaleString()} bytes (${used.toFixed(4)} GB) / ${sub.data_gb>0?((sub.data_gb*1073741824).toLocaleString()+" bytes ("+sub.data_gb+" GB)"):"Unlimited"}`;
   const expExact=sub.expire_at?`Exact expiry: ${sub.expire_at}`:(firstuseSec>0?`Expiry starts after first use (${firstuseDays} days)`:"No expiry set");
-  const nodes=(sub.nodes||[]).map(n=>n.name||n).join(", ")||"None";
+  const nodes=(sub.nodes||[]).map(n=>n.inbound_name||n.name||n).join(", ")||"None";
   const fmtDate=s=>s?s.substring(0,16).replace("T"," "):"—";
   const firstStr=stats.first_access?`<span title="${stats.first_access}">${fmtDate(stats.first_access)}</span>`:"—";
   const lastStr=stats.last_access?`<span title="${stats.last_access}">${fmtDate(stats.last_access)}</span>`:"—";
@@ -840,6 +845,8 @@ async function editSub(id){
   document.getElementById("me-sm").value=sub.show_multiplier||1;
   const assignedIds=new Set((sub.nodes||[]).map(n=>n.node_id));
   editingOrigNodes=new Set(assignedIds);
+  document.getElementById("me-node-order").innerHTML=_renderNodeOrderList(sub.nodes||[]);
+  _initNodeOrderDrag();
   document.getElementById("me-nodes").innerHTML=_renderInboundSelector(nodes,assignedIds);
   document.getElementById("m-edit").classList.add("open");
 }
@@ -871,6 +878,9 @@ async function submitEdit(){
   if(toAdd.length) reqs.push(fetch(API+"/api/subscriptions/"+editingSubId+"/nodes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({node_ids:toAdd})}));
   for(const nid of toRemove) reqs.push(fetch(API+"/api/subscriptions/"+editingSubId+"/nodes/"+nid,{method:"DELETE"}));
   await Promise.all(reqs);
+  const remaining=_nodeOrder.filter(id=>!toRemove.includes(id));
+  const finalOrder=[...remaining,...toAdd];
+  if(finalOrder.length>0) await fetch(API+"/api/subscriptions/"+editingSubId+"/nodes/reorder",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({node_ids:finalOrder})});
   closeM("m-edit"); loadSubs(); showAlert("s-alert","Subscription updated","ok");
 }
 
@@ -988,6 +998,25 @@ function _renderInboundSelector(nodes, checkedIds){
   const filtered=nodes.filter(n=>(n.inbounds||[]).length>0);
   if(filtered.length===0) return '<div style="color:var(--text2);font-size:0.84em;padding:8px">No sub-nodes configured. Add nodes and sub-nodes in the Nodes section first.</div>';
   return filtered.map(n=>`<div class="node-group"><div class="node-group-label">${n.name}</div>${(n.inbounds||[]).map(ni=>`<label class="node-item"><input type="checkbox" value="${ni.id}" ${checkedIds.has(ni.id)?"checked":""}><div><div class="node-item-name">${ni.name||"Inbound "+ni.inbound_id}</div><div class="node-item-addr">ID: ${ni.inbound_id}</div></div></label>`).join("")}</div>`).join("");
+}
+
+function _renderNodeOrderList(assignedNodes){
+  if(!assignedNodes.length) return '<div style="color:var(--text3);font-size:0.82em;padding:2px 0">No nodes assigned yet</div>';
+  _nodeOrder=assignedNodes.map(n=>n.node_id);
+  return '<div class="node-order-list" id="me-node-order-list">'+assignedNodes.map(n=>`<div class="node-order-item" draggable="true" data-node-id="${n.node_id}"><span style="color:var(--text3);font-size:1.1em">⠿</span>${n.inbound_name||n.name}</div>`).join("")+'</div>';
+}
+
+function _initNodeOrderDrag(){
+  const list=document.getElementById("me-node-order-list");
+  if(!list) return;
+  let src=null;
+  list.querySelectorAll("[draggable]").forEach(item=>{
+    item.addEventListener("dragstart",e=>{src=item;item.classList.add("dragging");e.dataTransfer.effectAllowed="move";});
+    item.addEventListener("dragend",()=>{src=null;list.querySelectorAll("[draggable]").forEach(i=>i.classList.remove("dragging","drag-over"));_nodeOrder=[...list.querySelectorAll("[data-node-id]")].map(el=>parseInt(el.dataset.nodeId));});
+    item.addEventListener("dragover",e=>{e.preventDefault();if(item!==src)item.classList.add("drag-over");});
+    item.addEventListener("dragleave",()=>item.classList.remove("drag-over"));
+    item.addEventListener("drop",e=>{e.preventDefault();if(src&&item!==src){const rect=item.getBoundingClientRect();if(e.clientY<rect.top+rect.height/2)list.insertBefore(src,item);else list.insertBefore(src,item.nextSibling);item.classList.remove("drag-over");}});
+  });
 }
 
 async function loadNodes(){
