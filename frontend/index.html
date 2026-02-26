@@ -490,6 +490,7 @@ Refresh
 </div>
 <div class="fg" style="margin-top:-6px"><label class="fl" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="me-firstuse" style="accent-color:var(--accent)" onchange="document.getElementById('me-firstuse-days').style.display=this.checked?'':'none'">Start expiry after first use</label></div>
 <div class="fg" id="me-firstuse-days" style="display:none"><label class="fl">First-use expiry (days)</label><input class="fi" type="number" value="30" min="1"></div>
+<div class="fg"><label class="fl">Set Exact Expiry Date</label><input class="fi" id="me-expire-date" type="date"></div>
 <div style="display:flex;gap:8px"><button id="me-no-expire-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoExpire()">Set No Expiry</button><button id="me-no-limit-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoDataLimit()">Set No Data Limit</button></div>
 <div class="fg"><label class="fl">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="me-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
@@ -804,12 +805,12 @@ async function editSub(id){
   document.getElementById("me-days").value=0; document.getElementById("me-days").disabled=false; _removeExpiry=false; document.getElementById("me-no-expire-btn").textContent="Set No Expiry"; document.getElementById("me-no-expire-btn").style.color="";
   document.getElementById("me-data").disabled=false; _removeDataLimit=false; document.getElementById("me-no-limit-btn").textContent="Set No Data Limit"; document.getElementById("me-no-limit-btn").style.color="";
   const firstuseSec=parseInt(sub.expire_after_first_use_seconds)||0;
-  const firstuseStarted=firstuseSec>0&&!!sub.expire_at;
   document.getElementById("me-firstuse").checked=firstuseSec>0;
-  document.getElementById("me-firstuse").disabled=firstuseStarted;
+  document.getElementById("me-firstuse").disabled=false;
   document.getElementById("me-firstuse-days").style.display=firstuseSec>0?"":"none";
   document.getElementById("me-firstuse-days").querySelector("input").value=firstuseSec>0?Math.round(firstuseSec/86400):30;
-  document.getElementById("me-firstuse-days").querySelector("input").disabled=firstuseStarted;
+  document.getElementById("me-firstuse-days").querySelector("input").disabled=false;
+  document.getElementById("me-expire-date").value=sub.expire_at?sub.expire_at.substring(0,10):"";
   document.getElementById("me-ip").value=sub.ip_limit||0;
   document.getElementById("me-sm").value=sub.show_multiplier||1;
   const assignedIds=new Set((sub.nodes||[]).map(n=>n.node_id));
@@ -836,7 +837,7 @@ function setNoDataLimit(){
 async function submitEdit(){
   if(!editingSubId) return;
   const body={comment:document.getElementById("me-comment").value.trim(),data_gb:_removeDataLimit?0:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
-  if(_removeExpiry){ body.remove_expiry=true; } else { const days=parseInt(document.getElementById("me-days").value)||0; if(days>0) body.days=days; else if(days<0) body.remove_days=-days; }
+  if(_removeExpiry){ body.remove_expiry=true; } else { const expDate=document.getElementById("me-expire-date").value; if(expDate){ body.expire_at=expDate; } else { const days=parseInt(document.getElementById("me-days").value)||0; if(days>0) body.days=days; else if(days<0) body.remove_days=-days; } }
   if(document.getElementById("me-firstuse").checked){ const d=parseInt(document.getElementById("me-firstuse-days").querySelector("input").value)||0; body.expire_after_first_use_seconds=Math.max(0,d*86400); } else { body.expire_after_first_use_seconds=0; }
   const checked=new Set([...document.querySelectorAll("#me-nodes input:checked")].map(i=>parseInt(i.value)));
   const toAdd=[...checked].filter(id=>!editingOrigNodes.has(id));

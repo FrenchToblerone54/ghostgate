@@ -352,6 +352,14 @@ def register_routes(panel_path):
                     updates["expire_at"] = (base - timedelta(days=int(body["remove_days"]))).isoformat()
                 except Exception:
                     pass
+        if body.get("expire_at"):
+            try:
+                d = datetime.fromisoformat(body["expire_at"])
+                if d.tzinfo is None:
+                    d = d.replace(tzinfo=timezone.utc)
+                updates["expire_at"] = d.isoformat()
+            except Exception:
+                pass
         db.update_sub(sub_id, **updates)
         sub = db.get_sub(sub_id)
         snodes = db.get_sub_nodes(sub_id)
