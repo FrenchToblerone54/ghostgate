@@ -105,7 +105,7 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
         except Exception:
             pass
-    expiry_time = -expire_after_first_use_seconds if expire_after_first_use_seconds>0 and not sub.get("expire_at") else expire_ms
+    expiry_time = -expire_after_first_use_seconds*1000 if expire_after_first_use_seconds>0 and not sub.get("expire_at") else expire_ms
     added_nodes = []
     for node_id in node_ids:
         node = db.get_node(node_id)

@@ -314,7 +314,7 @@ def register_routes(panel_path):
                 xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
                 total_limit_bytes = int(max(0, data_gb * 1073741824 - (sub.get("used_bytes") or 0)) / (node.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
                 email = f"{sub_id}-{node_id}"
-                expiry_time = -expire_after_first_use_seconds if expire_after_first_use_seconds>0 else expire_ms
+                expiry_time = -expire_after_first_use_seconds*1000 if expire_after_first_use_seconds>0 else expire_ms
                 client = xui.make_client(email, client_uuid, expiry_time, ip_limit, sub_id, comment or "", total_limit_bytes)
                 ok = xui.add_client(node["inbound_id"], client)
                 if ok:
@@ -373,7 +373,7 @@ def register_routes(panel_path):
                 except Exception:
                     pass
             expire_after = int(sub.get("expire_after_first_use_seconds") or 0) if sub else 0
-            expiry_time = -expire_after if expire_after>0 and not (sub and sub.get("expire_at")) else expire_ms
+            expiry_time = -expire_after*1000 if expire_after>0 and not (sub and sub.get("expire_at")) else expire_ms
             ip_limit = sub.get("ip_limit", 0) if sub else 0
             for sn in snodes:
                 try:
