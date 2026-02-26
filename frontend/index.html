@@ -804,9 +804,12 @@ async function editSub(id){
   document.getElementById("me-days").value=0; document.getElementById("me-days").disabled=false; _removeExpiry=false; document.getElementById("me-no-expire-btn").textContent="Set No Expiry"; document.getElementById("me-no-expire-btn").style.color="";
   document.getElementById("me-data").disabled=false; _removeDataLimit=false; document.getElementById("me-no-limit-btn").textContent="Set No Data Limit"; document.getElementById("me-no-limit-btn").style.color="";
   const firstuseSec=parseInt(sub.expire_after_first_use_seconds)||0;
+  const firstuseStarted=firstuseSec>0&&!!sub.expire_at;
   document.getElementById("me-firstuse").checked=firstuseSec>0;
+  document.getElementById("me-firstuse").disabled=firstuseStarted;
   document.getElementById("me-firstuse-days").style.display=firstuseSec>0?"":"none";
   document.getElementById("me-firstuse-days").querySelector("input").value=firstuseSec>0?Math.round(firstuseSec/86400):30;
+  document.getElementById("me-firstuse-days").querySelector("input").disabled=firstuseStarted;
   document.getElementById("me-ip").value=sub.ip_limit||0;
   document.getElementById("me-sm").value=sub.show_multiplier||1;
   const assignedIds=new Set((sub.nodes||[]).map(n=>n.node_id));
