@@ -68,6 +68,10 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/nodes\n"
         "/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...] [--multiplier N]\n"
         "/delnode <id>\n"
+        "/subnodes [node_id]\n"
+        "/addsubnode --node N --inbound N [--name X] [--multiplier N]\n"
+        "/editsubnode <id> [--name X] [--inbound N] [--multiplier N] [--enable|--disable]\n"
+        "/delsubnode <id>\n"
     )
 
 async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -307,6 +311,152 @@ async def cmd_delnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     db.delete_node(node_id)
     await update.message.reply_text(f"Deleted node: [{node_id}] {node['name']}")
 
+async def cmd_addsubnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    try:
+        args=shlex.split(" ".join(ctx.args or []))
+    except Exception:
+        args=ctx.args or []
+    opts=_parse_opts(args)
+    if not all(k in opts for k in ["node","inbound"]):
+        await update.message.reply_text("Usage: /addsubnode --node <node_id> --inbound <id> [--name X] [--multiplier N]")
+        return
+    try:
+        node_id=int(opts.get("node",0))
+        inbound_id=int(opts.get("inbound",0))
+        multiplier=max(1.0,float(opts.get("multiplier",1.0)))
+    except ValueError:
+        await update.message.reply_text("Node ID, inbound ID, and multiplier must be numbers.")
+        return
+    if node_id<=0 or inbound_id<=0:
+        await update.message.reply_text("Node ID and inbound ID must be greater than 0.")
+        return
+    node=db.get_node(node_id)
+    if not node:
+        await update.message.reply_text("Node not found.")
+        return
+    ni_id=db.add_node_inbound(node_id,inbound_id,opts.get("name"),multiplier)
+    mult_str=f" ×{multiplier:g}" if multiplier!=1.0 else ""
+    label=opts.get("name") or f"Inbound {inbound_id}"
+    await update.message.reply_text(f"Sub-node added: [{ni_id}] {label}{mult_str}\nNode: [{node_id}] {node['name']}")
+
+async def cmd_delsubnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Usage: /delsubnode <subnode_id>")
+        return
+    try:
+        ni_id=int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("Sub-node ID must be a number.")
+        return
+    ni=db.get_node_inbound_with_node(ni_id)
+    if not ni:
+        await update.message.reply_text("Sub-node not found.")
+        return
+    db.delete_node_inbound(ni_id)
+    await update.message.reply_text(f"Deleted sub-node: [{ni_id}] {ni.get('inbound_name') or ni['name']} (inbound {ni['inbound_id']})")
+
+async def cmd_editsubnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Usage: /editsubnode <subnode_id> [--name X] [--inbound N] [--multiplier N] [--enable] [--disable]")
+        return
+    try:
+        all_args=shlex.split(" ".join(ctx.args))
+    except Exception:
+        all_args=ctx.args
+    try:
+        ni_id=int(all_args[0])
+    except ValueError:
+        await update.message.reply_text("Sub-node ID must be a number.")
+        return
+    ni=db.get_node_inbound(ni_id)
+    if not ni:
+        await update.message.reply_text("Sub-node not found.")
+        return
+    opts=_parse_opts(all_args[1:])
+    updates={}
+    if "name" in opts:
+        updates["name"]=opts["name"]
+    if "inbound" in opts:
+        try:
+            updates["inbound_id"]=int(opts["inbound"])
+        except ValueError:
+            await update.message.reply_text("Inbound ID must be a number.")
+            return
+    if "multiplier" in opts:
+        try:
+            updates["traffic_multiplier"]=max(1.0,float(opts["multiplier"]))
+        except ValueError:
+            await update.message.reply_text("Multiplier must be a number.")
+            return
+    if "enable" in opts:
+        updates["enabled"]=1
+    if "disable" in opts:
+        updates["enabled"]=0
+    if not updates:
+        await update.message.reply_text("No valid changes provided.")
+        return
+    db.update_node_inbound(ni_id,**updates)
+    updated=db.get_node_inbound_with_node(ni_id)
+    st="on" if updated and updated.get("inbound_enabled") else "off"
+    mult=(updated.get("traffic_multiplier") if updated else ni.get("traffic_multiplier",1.0)) or 1.0
+    mult_str=f" ×{mult:g}" if mult!=1.0 else ""
+    name=(updated.get("inbound_name") if updated else ni.get("name")) or f"Inbound {(updated.get('inbound_id') if updated else ni.get('inbound_id'))}"
+    inbound_id=updated.get("inbound_id") if updated else ni.get("inbound_id")
+    await update.message.reply_text(f"Updated sub-node: [{ni_id}] {name}{mult_str}\nInbound: {inbound_id} ({st})")
+
+async def cmd_subnodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    if ctx.args:
+        try:
+            node_id=int(ctx.args[0])
+        except ValueError:
+            await update.message.reply_text("Usage: /subnodes [node_id]")
+            return
+        node=db.get_node(node_id)
+        if not node:
+            await update.message.reply_text("Node not found.")
+            return
+        inbounds=db.get_node_inbounds(node_id)
+        if not inbounds:
+            await update.message.reply_text(f"No sub-nodes for node [{node_id}] {node['name']}.")
+            return
+        lines=[f"Sub-nodes for [{node_id}] {node['name']}:\n"]
+        for ni in inbounds:
+            ni_status="on" if ni.get("enabled") else "off"
+            mult=ni.get("traffic_multiplier") or 1.0
+            mult_str=f" ×{mult:g}" if mult!=1.0 else ""
+            lines.append(f"[{ni['id']}] {ni['name'] or 'Inbound '+str(ni['inbound_id'])} — ID:{ni['inbound_id']}{mult_str} ({ni_status})")
+        await update.message.reply_text("\n".join(lines))
+        return
+    nodes=db.get_nodes()
+    if not nodes:
+        await update.message.reply_text("No nodes configured.")
+        return
+    lines=["Sub-nodes:\n"]
+    has_any=False
+    for n in nodes:
+        inbounds=db.get_node_inbounds(n["id"])
+        if not inbounds:
+            continue
+        has_any=True
+        lines.append(f"[{n['id']}] {n['name']}")
+        for ni in inbounds:
+            ni_status="on" if ni.get("enabled") else "off"
+            mult=ni.get("traffic_multiplier") or 1.0
+            mult_str=f" ×{mult:g}" if mult!=1.0 else ""
+            lines.append(f"  └─ [{ni['id']}] {ni['name'] or 'Inbound '+str(ni['inbound_id'])} — ID:{ni['inbound_id']}{mult_str} ({ni_status})")
+    if not has_any:
+        await update.message.reply_text("No sub-nodes configured.")
+        return
+    await update.message.reply_text("\n".join(lines))
+
 async def cmd_regen(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update.effective_user.id):
         return
@@ -367,6 +517,10 @@ async def _post_init(app):
         ("nodes", "List nodes"),
         ("addnode", "Add a node"),
         ("delnode", "Delete a node"),
+        ("subnodes", "List sub-nodes"),
+        ("addsubnode", "Add sub-node"),
+        ("editsubnode", "Edit sub-node"),
+        ("delsubnode", "Delete sub-node"),
     ])
 
 def _build_app():
@@ -389,6 +543,11 @@ def _build_app():
     application.add_handler(CommandHandler("nodes", cmd_nodes))
     application.add_handler(CommandHandler("addnode", cmd_addnode))
     application.add_handler(CommandHandler("delnode", cmd_delnode))
+    application.add_handler(CommandHandler("subnodes", cmd_subnodes))
+    application.add_handler(CommandHandler("listsubnode", cmd_subnodes))
+    application.add_handler(CommandHandler("addsubnode", cmd_addsubnode))
+    application.add_handler(CommandHandler("editsubnode", cmd_editsubnode))
+    application.add_handler(CommandHandler("delsubnode", cmd_delsubnode))
     return application
 
 async def _run_once():
