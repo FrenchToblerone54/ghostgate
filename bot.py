@@ -393,13 +393,23 @@ def _build_app():
 
 async def _run_once():
     app = _build_app()
+    async def _safe_wait(coro, timeout, name):
+        try:
+            await asyncio.wait_for(coro, timeout=timeout)
+        except Exception as e:
+            logger.warning(f"{name} failed/timed out: {e}")
     async with app:
         await app.start()
         await app.updater.start_polling(drop_pending_updates=True)
+        watchdog_task = None
+        idle_task = None
         async def _watchdog():
             fails = 0
             while True:
                 await asyncio.sleep(30)
+                polling_task = getattr(app.updater, "_Updater__polling_task", None)
+                if not app.updater.running or polling_task is None or polling_task.done():
+                    raise RuntimeError("bot updater polling task stopped")
                 try:
                     await asyncio.wait_for(app.bot.get_me(), timeout=10)
                     fails = 0
@@ -408,7 +418,21 @@ async def _run_once():
                     logger.warning(f"bot watchdog failed ({fails}/3): {e}")
                     if fails >= 3:
                         raise RuntimeError("bot watchdog restart")
-        await asyncio.gather(asyncio.sleep(float("inf")), _watchdog())
+        try:
+            watchdog_task = asyncio.create_task(_watchdog())
+            idle_task = asyncio.create_task(asyncio.sleep(float("inf")))
+            done, _ = await asyncio.wait({watchdog_task, idle_task}, return_when=asyncio.FIRST_EXCEPTION)
+            for t in done:
+                exc = t.exception()
+                if exc:
+                    raise exc
+        finally:
+            if watchdog_task and not watchdog_task.done():
+                watchdog_task.cancel()
+            if idle_task and not idle_task.done():
+                idle_task.cancel()
+            await _safe_wait(app.updater.stop(), 15, "bot updater.stop")
+            await _safe_wait(app.stop(), 15, "bot app.stop")
 
 def start():
     while True:
@@ -419,4 +443,3 @@ def start():
         except Exception as e:
             logger.error(f"bot crashed: {e}, restarting in 5s")
             time.sleep(5)
-
