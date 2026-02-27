@@ -181,6 +181,134 @@ def cmd_nodes(args):
             lines.append(f"  [{DIM}]└─[/] [{MUTED}][{ni['id']}][/] {ni['name'] or 'Inbound '+str(ni['inbound_id'])}  [{MUTED}]ID:{ni['inbound_id']}[/]{mult_str}  {ni_status}")
     console.print(Panel("\n".join(lines), title=f"[bold white]Nodes[/]", border_style=DIM, padding=(0, 1)))
 
+def cmd_subnodes(args):
+    if args:
+        try:
+            node_id = int(args[0])
+        except ValueError:
+            console.print(f"[{DANGER}]Usage: ghostgate subnodes [node_id][/]")
+            return
+        node = db.get_node(node_id)
+        if not node:
+            console.print(f"[{DANGER}]Node not found: {node_id}[/]")
+            return
+        inbounds = db.get_node_inbounds(node_id)
+        if not inbounds:
+            console.print(f"[{MUTED}]No sub-nodes for node [{node_id}] {node['name']}[/]")
+            return
+        lines = [f"[bold white]Sub-nodes for [{node_id}] {node['name']}[/]"]
+        for ni in inbounds:
+            ni_status = f"[{ACC}]On[/]" if ni.get("enabled") else f"[{DANGER}]Off[/]"
+            mult = ni.get("traffic_multiplier") or 1.0
+            mult_str = f"  [{WARN}]×{mult:g}[/]" if mult != 1.0 else ""
+            lines.append(f"  [{MUTED}][{ni['id']}][/] {ni['name'] or 'Inbound '+str(ni['inbound_id'])}  [{MUTED}]ID:{ni['inbound_id']}[/]{mult_str}  {ni_status}")
+        console.print(Panel("\n".join(lines), border_style=DIM, padding=(0, 1)))
+        return
+    nodes = db.get_nodes()
+    if not nodes:
+        console.print(f"[{MUTED}]No nodes configured.[/]")
+        return
+    lines = []
+    has_any = False
+    for n in nodes:
+        inbounds = db.get_node_inbounds(n["id"])
+        if not inbounds:
+            continue
+        has_any = True
+        lines.append(f"[bold white][{n['id']}] {n['name']}[/]")
+        for ni in inbounds:
+            ni_status = f"[{ACC}]On[/]" if ni.get("enabled") else f"[{DANGER}]Off[/]"
+            mult = ni.get("traffic_multiplier") or 1.0
+            mult_str = f"  [{WARN}]×{mult:g}[/]" if mult != 1.0 else ""
+            lines.append(f"  [{DIM}]└─[/] [{MUTED}][{ni['id']}][/] {ni['name'] or 'Inbound '+str(ni['inbound_id'])}  [{MUTED}]ID:{ni['inbound_id']}[/]{mult_str}  {ni_status}")
+    if not has_any:
+        console.print(f"[{MUTED}]No sub-nodes configured.[/]")
+        return
+    console.print(Panel("\n".join(lines), title=f"[bold white]Sub-nodes[/]", border_style=DIM, padding=(0, 1)))
+
+def cmd_addsubnode(args):
+    opts = _parse_opts(args)
+    if "node" not in opts or "inbound" not in opts:
+        console.print(f"[{DANGER}]Usage: ghostgate addsubnode --node <node_id> --inbound <id> [--name X] [--multiplier N][/]")
+        return
+    try:
+        node_id = int(opts.get("node", 0))
+        inbound_id = int(opts.get("inbound", 0))
+        multiplier = max(1.0, float(opts.get("multiplier", 1.0)))
+    except ValueError:
+        console.print(f"[{DANGER}]Node ID, inbound ID, and multiplier must be numeric.[/]")
+        return
+    if node_id <= 0 or inbound_id <= 0:
+        console.print(f"[{DANGER}]Node ID and inbound ID must be greater than 0.[/]")
+        return
+    node = db.get_node(node_id)
+    if not node:
+        console.print(f"[{DANGER}]Node not found: {node_id}[/]")
+        return
+    ni_id = db.add_node_inbound(node_id, inbound_id, opts.get("name"), multiplier)
+    label = opts.get("name") or f"Inbound {inbound_id}"
+    mult_str = f" [{WARN}]×{multiplier:g}[/]" if multiplier != 1.0 else ""
+    console.print(f"[{ACC}]Sub-node added:[/] [{MUTED}][{ni_id}][/] {label}{mult_str} [{MUTED}]on node [{node_id}] {node['name']}[/]")
+
+def cmd_editsubnode(args):
+    if not args:
+        console.print(f"[{DANGER}]Usage: ghostgate editsubnode <subnode_id> [--name X] [--inbound N] [--multiplier N] [--enable] [--disable][/]")
+        return
+    try:
+        ni_id = int(args[0])
+    except ValueError:
+        console.print(f"[{DANGER}]Sub-node ID must be a number.[/]")
+        return
+    ni = db.get_node_inbound(ni_id)
+    if not ni:
+        console.print(f"[{DANGER}]Sub-node not found: {ni_id}[/]")
+        return
+    opts = _parse_opts(args[1:])
+    updates = {}
+    if "name" in opts:
+        updates["name"] = opts["name"]
+    if "inbound" in opts:
+        try:
+            updates["inbound_id"] = int(opts["inbound"])
+        except ValueError:
+            console.print(f"[{DANGER}]Inbound ID must be a number.[/]")
+            return
+    if "multiplier" in opts:
+        try:
+            updates["traffic_multiplier"] = max(1.0, float(opts["multiplier"]))
+        except ValueError:
+            console.print(f"[{DANGER}]Multiplier must be a number.[/]")
+            return
+    if "enable" in opts:
+        updates["enabled"] = 1
+    if "disable" in opts:
+        updates["enabled"] = 0
+    if not updates:
+        console.print(f"[{WARN}]No valid changes provided.[/]")
+        return
+    db.update_node_inbound(ni_id, **updates)
+    updated = db.get_node_inbound(ni_id) or ni
+    st = f"[{ACC}]On[/]" if updated.get("enabled") else f"[{DANGER}]Off[/]"
+    mult = updated.get("traffic_multiplier") or 1.0
+    mult_str = f" [{WARN}]×{mult:g}[/]" if mult != 1.0 else ""
+    console.print(f"[{ACC}]Updated sub-node:[/] [{MUTED}][{ni_id}][/] {updated.get('name') or 'Inbound '+str(updated.get('inbound_id'))}{mult_str} [{MUTED}]ID:{updated.get('inbound_id')}[/] {st}")
+
+def cmd_delsubnode(args):
+    if not args:
+        console.print(f"[{DANGER}]Usage: ghostgate delsubnode <subnode_id>[/]")
+        return
+    try:
+        ni_id = int(args[0])
+    except ValueError:
+        console.print(f"[{DANGER}]Sub-node ID must be a number.[/]")
+        return
+    ni = db.get_node_inbound_with_node(ni_id)
+    if not ni:
+        console.print(f"[{DANGER}]Sub-node not found: {ni_id}[/]")
+        return
+    db.delete_node_inbound(ni_id)
+    console.print(f"[{ACC}]Deleted sub-node:[/] [{MUTED}][{ni_id}][/] {ni.get('inbound_name') or ni['name']} [{MUTED}](inbound {ni['inbound_id']})[/]")
+
 def cmd_status(args):
     subs, total = db.get_subs(page=1, per_page=0)
     now = datetime.now(timezone.utc)
@@ -388,6 +516,10 @@ def cmd_help(args):
         f"  [{ACC}]regen[/] [{MUTED}]<id|comment>[/]                         Regenerate subscription nanoid",
         f"  [{ACC}]delete[/] [{MUTED}]<id|comment>[/]                         Delete subscription",
         f"  [{ACC}]nodes[/]                                       List nodes",
+        f"  [{ACC}]subnodes[/] [{MUTED}][node_id][/]                          List sub-nodes",
+        f"  [{ACC}]addsubnode[/] [{MUTED}]--node N --inbound N [--name X] [--multiplier N][/]",
+        f"  [{ACC}]editsubnode[/] [{MUTED}]<id> [--name X] [--inbound N] [--multiplier N] [--enable|--disable][/]",
+        f"  [{ACC}]delsubnode[/] [{MUTED}]<id>[/]                              Delete sub-node",
         f"  [{ACC}]status[/]                                      System overview",
         f"  [{ACC}]update[/]                                      Check and apply update",
     ]
@@ -397,11 +529,16 @@ _COMMANDS = {
     "list": cmd_list,
     "stats": cmd_stats,
     "nodes": cmd_nodes,
+    "subnodes": cmd_subnodes,
+    "listsubnode": cmd_subnodes,
     "status": cmd_status,
     "create": cmd_create,
     "delete": cmd_delete,
     "edit": cmd_edit,
     "regen": cmd_regen,
+    "addsubnode": cmd_addsubnode,
+    "editsubnode": cmd_editsubnode,
+    "delsubnode": cmd_delsubnode,
     "update": cmd_update,
     "help": cmd_help,
 }
