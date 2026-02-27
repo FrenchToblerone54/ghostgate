@@ -63,6 +63,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/delete <id or comment>\n"
         "/stats <id or comment>\n"
         "/edit <id or comment> [--comment X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]\n"
+        "/regen <id or comment>\n"
         "/list [page] — 10 per page\n"
         "/nodes\n"
         "/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...] [--multiplier N]\n"
@@ -306,6 +307,33 @@ async def cmd_delnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     db.delete_node(node_id)
     await update.message.reply_text(f"Deleted node: [{node_id}] {node['name']}")
 
+async def cmd_regen(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Usage: /regen <id or comment>")
+        return
+    from nanoid import generate
+    identifier = " ".join(ctx.args)
+    sub = db.get_sub(identifier) or db.get_sub_by_comment(identifier)
+    if not sub:
+        await update.message.reply_text("Subscription not found.")
+        return
+    new_id = generate(size=20)
+    snodes = db.get_sub_nodes(sub["id"])
+    for sn in snodes:
+        try:
+            xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+            xui.update_client_email_subid(sn["inbound_id"], sn["client_uuid"], sn["email"], f"{new_id}-{sn['node_id']}", new_id)
+        except Exception:
+            pass
+    db.rename_sub(sub["id"], new_id)
+    new_link = _sub_url(new_id)
+    msg = (f"ID Regenerated\n\nOld: <tg-spoiler>{_html.escape(sub['id'])}</tg-spoiler>\nNew: <tg-spoiler>{_html.escape(new_id)}</tg-spoiler>\nLink: <tg-spoiler>{_html.escape(new_link)}</tg-spoiler>")
+    await update.message.reply_text(msg, parse_mode="HTML")
+    qr_buf = _make_qr_bytes(new_link)
+    await update.message.reply_photo(photo=qr_buf, caption=f"QR: {sub.get('comment') or new_id}")
+
 async def cmd_nodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update.effective_user.id):
         return
@@ -335,6 +363,7 @@ async def _post_init(app):
         ("stats", "Subscription stats"),
         ("list", "List subscriptions (10/page)"),
         ("edit", "Edit subscription"),
+        ("regen", "Regenerate subscription nanoid"),
         ("nodes", "List nodes"),
         ("addnode", "Add a node"),
         ("delnode", "Delete a node"),
@@ -356,6 +385,7 @@ def _build_app():
     application.add_handler(CommandHandler("stats", cmd_stats))
     application.add_handler(CommandHandler("list", cmd_list))
     application.add_handler(CommandHandler("edit", cmd_edit))
+    application.add_handler(CommandHandler("regen", cmd_regen))
     application.add_handler(CommandHandler("nodes", cmd_nodes))
     application.add_handler(CommandHandler("addnode", cmd_addnode))
     application.add_handler(CommandHandler("delnode", cmd_delnode))

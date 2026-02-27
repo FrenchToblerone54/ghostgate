@@ -334,6 +334,29 @@ def cmd_edit(args):
     console.print(f"[{ACC}]Updated: {sub.get('comment') or sub['id']}[/]")
     cmd_stats([sub["id"]])
 
+def cmd_regen(args):
+    from xui_client import XUIClient
+    from nanoid import generate
+    if not args:
+        console.print(f"[{DANGER}]Usage: ghostgate regen <id or comment>[/]")
+        return
+    key = args[0]
+    sub = db.get_sub(key) or db.get_sub_by_comment(key)
+    if not sub:
+        console.print(f"[{DANGER}]Not found: {key}[/]")
+        return
+    new_id = generate(size=20)
+    snodes = db.get_sub_nodes(sub["id"])
+    for sn in snodes:
+        try:
+            xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+            xui.update_client_email_subid(sn["inbound_id"], sn["client_uuid"], sn["email"], f"{new_id}-{sn['node_id']}", new_id)
+        except Exception: pass
+    db.rename_sub(sub["id"], new_id)
+    base_url = os.getenv("BASE_URL", "").rstrip("/")
+    sub_url = f"{base_url}/sub/{new_id}" if base_url else f"/sub/{new_id}"
+    console.print(Panel(f"  [{MUTED}]New ID[/]  [{ACC}]{new_id}[/]\n  [{MUTED}]URL[/]     [{BLUE}]{sub_url}[/]", title=f"[bold {ACC}]Regenerated: {sub.get('comment') or sub['id']}[/]", border_style=ACC, padding=(0, 1)))
+
 def cmd_update(args):
     console.print(f"[{MUTED}]Current version:[/] [{ACC}]v{updater.VERSION}[/]")
     console.print(f"[{MUTED}]Checking for updates...[/]")
@@ -360,8 +383,9 @@ def cmd_help(args):
     lines = [
         f"  [{ACC}]list[/] [{MUTED}][--search X][/]                          List all subscriptions",
         f"  [{ACC}]stats[/] [{MUTED}]<id|comment>[/]                         Show detailed subscription info",
-        f"  [{ACC}]create[/] [{MUTED}][--id X] --comment X [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none][/]", 
-        f"  [{ACC}]edit[/] [{MUTED}]<id|comment> [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable][/]", 
+        f"  [{ACC}]create[/] [{MUTED}][--id X] --comment X [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none][/]",
+        f"  [{ACC}]edit[/] [{MUTED}]<id|comment> [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable][/]",
+        f"  [{ACC}]regen[/] [{MUTED}]<id|comment>[/]                         Regenerate subscription nanoid",
         f"  [{ACC}]delete[/] [{MUTED}]<id|comment>[/]                         Delete subscription",
         f"  [{ACC}]nodes[/]                                       List nodes",
         f"  [{ACC}]status[/]                                      System overview",
@@ -377,6 +401,7 @@ _COMMANDS = {
     "create": cmd_create,
     "delete": cmd_delete,
     "edit": cmd_edit,
+    "regen": cmd_regen,
     "update": cmd_update,
     "help": cmd_help,
 }

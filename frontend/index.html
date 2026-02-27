@@ -535,6 +535,9 @@ Refresh
 <div class="detail-url"><code id="md-url"></code><button id="md-copy" onclick="copyDetailUrl()">Copy</button></div>
 <div class="detail-rows" id="md-rows"></div>
 </div>
+<div class="modal-ft">
+<button class="btn btn-ghost" id="md-regen-btn" onclick="regenSubId()">Regen ID</button>
+</div>
 </div>
 </div>
 
@@ -582,7 +585,7 @@ Refresh
 <script>
 const API="{{prefix}}";
 let sPage=1,sTotalPages=1,sSearch="",sTimer=null,sPerPage=20;
-let editingSubId=null,editingNodeId=null,editingNiId=null,editingInboundNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set(),_nodeOrder=[];
+let editingSubId=null,editingNodeId=null,editingNiId=null,editingInboundNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set(),_nodeOrder=[],detailSubId=null;
 let logStream=null,liveLog=false;
 let subsStream=null;
 let prevNet={sent:0,recv:0,t:0};
@@ -792,6 +795,7 @@ async function submitCreate(){
 }
 
 async function viewSub(id){
+  detailSubId=id;
   const [sub,stats]=await Promise.all([fetch(API+"/api/subscriptions/"+id).then(r=>r.json()),fetch(API+"/api/subscriptions/"+id+"/stats").then(r=>r.json())]);
   document.getElementById("md-title").textContent=sub.comment||id;
   document.getElementById("md-qr").src=API+"/api/subscriptions/"+id+"/qr";
@@ -832,6 +836,19 @@ async function viewSub(id){
 function copyDetailUrl(){
   const url=document.getElementById("md-url").textContent;
   navigator.clipboard.writeText(url).then(()=>{ const btn=document.getElementById("md-copy"); btn.textContent="Copied!"; setTimeout(()=>btn.textContent="Copy",1800); });
+}
+
+async function regenSubId(){
+  if(!confirm("Regenerate subscription ID? The old URL will stop working immediately.")) return;
+  const btn=document.getElementById("md-regen-btn");
+  btn.disabled=true; btn.textContent="Regen...";
+  const r=await fetch(API+"/api/subscriptions/"+detailSubId+"/regen-id",{method:"POST"}).then(x=>x.json());
+  if(r.new_id){
+    detailSubId=r.new_id;
+    document.getElementById("md-url").textContent=window.location.origin+"/sub/"+r.new_id;
+    document.getElementById("md-qr").src=API+"/api/subscriptions/"+r.new_id+"/qr";
+  }
+  btn.disabled=false; btn.textContent="Regen ID";
 }
 
 async function editSub(id){

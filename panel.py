@@ -10,6 +10,7 @@ import subprocess
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from flask import Flask, jsonify, request, Response, render_template_string, abort
+from nanoid import generate
 import psutil
 import qrcode
 from dotenv import dotenv_values, set_key
@@ -634,6 +635,23 @@ def register_routes(panel_path):
                 except Exception:
                     pass
         return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/regen-id", methods=["POST"])
+    def api_sub_regen_id(sub_id):
+        sub = db.get_sub(sub_id)
+        if not sub:
+            return jsonify({"error": "not found"}), 404
+        new_id = generate(size=20)
+        snodes = db.get_sub_nodes(sub_id)
+        for sn in snodes:
+            try:
+                xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                xui.update_client_email_subid(sn["inbound_id"], sn["client_uuid"], sn["email"], f"{new_id}-{sn['node_id']}", new_id)
+            except Exception:
+                pass
+        db.rename_sub(sub_id, new_id)
+        base_url = BASE_URL or request.host_url.rstrip("/")
+        return jsonify({"new_id": new_id, "url": f"{base_url}/sub/{new_id}"})
 
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/stats")
     def api_sub_stats(sub_id):

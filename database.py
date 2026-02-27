@@ -333,6 +333,14 @@ def delete_sub(sub_id):
     with _conn() as c:
         c.execute("DELETE FROM subscriptions WHERE id=?", (sub_id,))
 
+def rename_sub(old_id, new_id):
+    with _conn() as c:
+        c.execute("PRAGMA foreign_keys=OFF")
+        c.execute("UPDATE subscriptions SET id=? WHERE id=?", (new_id, old_id))
+        c.execute("UPDATE subscription_nodes SET sub_id=?,email=REPLACE(email,?,?) WHERE sub_id=?", (new_id, old_id, new_id, old_id))
+        c.execute("UPDATE access_logs SET sub_id=? WHERE sub_id=?", (new_id, old_id))
+        c.execute("PRAGMA foreign_keys=ON")
+
 def add_sub_node(sub_id, node_id, client_uuid, email):
     with _conn() as c:
         cnt = c.execute("SELECT COUNT(*) FROM subscription_nodes WHERE sub_id=?", (sub_id,)).fetchone()[0]

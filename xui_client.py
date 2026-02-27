@@ -87,6 +87,14 @@ class XUIClient:
         client["totalGB"] = total_limit_bytes
         return self.update_client(inbound_id, client_uuid, client)
 
+    def update_client_email_subid(self, inbound_id, client_uuid, old_email, new_email, new_sub_id):
+        client = self.get_client_by_email(inbound_id, old_email)
+        if not client:
+            return False
+        client["email"] = new_email
+        client["subId"] = new_sub_id
+        return self.update_client(inbound_id, client_uuid, client)
+
     def test_connection(self):
         try:
             self._login()
