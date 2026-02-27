@@ -173,6 +173,8 @@ def sub_page(sub_id):
     if expire_ts > 0:
         diff = expire_ts - now_ts
         expire_str = f"{diff // 86400}d {(diff % 86400) // 3600}h" if diff > 0 else "Expired"
+    elif sub.get("expire_after_first_use_seconds", 0) > 0:
+        expire_str = "After First Use"
     else:
         expire_str = "No Expiry"
     data_label = os.getenv("DATA_LABEL", "⬇️ Data left")
