@@ -36,6 +36,7 @@ Save the panel URL shown at the end — it is your admin panel access path.
 /stats <id or comment>
 /list [page]
 /edit <id or comment> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
+/regen <id or comment>
 /nodes
 ```
 
@@ -80,6 +81,7 @@ The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the
 | `GET` | `/api/subscriptions/<id>/qr` | QR code PNG for the subscription link |
 | `POST` | `/api/subscriptions/<id>/nodes` | Add node(s) to an existing subscription |
 | `DELETE` | `/api/subscriptions/<id>/nodes/<node_id>` | Remove a node from a subscription |
+| `POST` | `/api/subscriptions/<id>/regen-id` | Regenerate the subscription nanoid (updates XUI clients). Returns `{new_id, url}` |
 
 **Create subscription — request body:**
 ```json
@@ -247,6 +249,7 @@ The CLI uses [rich](https://github.com/Textualize/rich) for colored terminal out
 | `ghostgate stats <id\|comment>` | Show traffic stats for a subscription |
 | `ghostgate create --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | Create a new subscription |
 | `ghostgate edit <id\|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable]` | Edit an existing subscription |
+| `ghostgate regen <id\|comment>` | Regenerate the subscription nanoid (old URL stops working) |
 | `ghostgate delete <id\|comment>` | Delete a subscription and remove its clients from all nodes |
 | `ghostgate nodes` | List all configured nodes |
 | `ghostgate update` | Check for an update and apply it if available |
@@ -261,6 +264,7 @@ ghostgate create --comment "Alice" --data 50 --days 30 --ip 2 --nodes 1,2
 ghostgate edit abc123 --data 100 --days 60
 ghostgate edit abc123 --remove-data 5 --remove-days 7
 ghostgate edit abc123 --disable
+ghostgate regen abc123
 ghostgate delete abc123
 ghostgate nodes
 ghostgate status

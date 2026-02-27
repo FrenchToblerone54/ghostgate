@@ -46,6 +46,7 @@ sudo ./install.sh
 /stats <آیدی یا کامنت>
 /list [صفحه]
 /edit <آیدی یا کامنت> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
+/regen <آیدی یا کامنت>
 /nodes
 ```
 
@@ -88,6 +89,7 @@ sudo ./install.sh
 | `GET` | `/api/subscriptions/<id>/qr` | تصویر PNG کد QR برای لینک اشتراک |
 | `POST` | `/api/subscriptions/<id>/nodes` | افزودن نود(ها) به اشتراک موجود |
 | `DELETE` | `/api/subscriptions/<id>/nodes/<node_id>` | حذف یک نود از اشتراک |
+| `POST` | `/api/subscriptions/<id>/regen-id` | بازسازی nanoid اشتراک (کلاینت‌های XUI به‌روز می‌شوند). پاسخ: `{new_id, url}` |
 
 **ایجاد اشتراک — بدنه درخواست:**
 ```json
@@ -255,6 +257,7 @@ sudo journalctl -u ghostgate -f
 | `ghostgate stats <آیدی\|کامنت>` | نمایش آمار ترافیک یک اشتراک |
 | `ghostgate create --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | ایجاد اشتراک جدید |
 | `ghostgate edit <آیدی\|کامنت> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable]` | ویرایش اشتراک موجود |
+| `ghostgate regen <آیدی\|کامنت>` | بازسازی nanoid اشتراک (لینک قدیمی از کار می‌افتد) |
 | `ghostgate delete <آیدی\|کامنت>` | حذف اشتراک و حذف کلاینت‌های آن از تمام نودها |
 | `ghostgate nodes` | لیست تمام نودهای تنظیم‌شده |
 | `ghostgate update` | بررسی به‌روزرسانی و اعمال آن در صورت وجود |
@@ -269,6 +272,7 @@ ghostgate create --comment "علی رضایی" --data 50 --days 30 --ip 2 --node
 ghostgate edit abc123 --data 100 --days 60
 ghostgate edit abc123 --remove-data 5 --remove-days 7
 ghostgate edit abc123 --disable
+ghostgate regen abc123
 ghostgate delete abc123
 ghostgate nodes
 ghostgate status
