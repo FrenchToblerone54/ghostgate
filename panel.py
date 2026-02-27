@@ -89,7 +89,7 @@ def _fmt_vless(client_uuid, label, server, port, stream_settings, security):
         sni = tls_s.get("serverName", "")
         if sni:
             params["sni"] = sni
-        if tls_s.get("allowInsecure", False):
+        if tls_s.get("allowInsecure") or tls_s.get("settings", {}).get("allowInsecure"):
             params["allowInsecure"] = "1"
     elif security == "reality":
         params["pbk"] = reality_s.get("publicKey", "")
