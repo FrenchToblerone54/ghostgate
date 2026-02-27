@@ -6,7 +6,15 @@ import logging
 from dotenv import load_dotenv
 import updater
 
-load_dotenv(os.getenv("ENV_PATH", ".env"))
+def _resolve_env_path():
+    env_path = os.getenv("ENV_PATH")
+    if env_path:
+        return env_path
+    if os.path.exists("/opt/ghostgate/.env"):
+        return "/opt/ghostgate/.env"
+    return ".env"
+
+load_dotenv(_resolve_env_path())
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,7 +60,7 @@ def _migrate(old_db_path, node_id):
     conn.close()
     print(f"Migrated {count}/{len(configs)} subscriptions from {old_db_path}")
 
-_CLI_COMMANDS = {"list", "stats", "nodes", "status", "create", "delete", "edit", "update", "help"}
+_CLI_COMMANDS = {"list", "stats", "nodes", "subnodes", "listsubnode", "addsubnode", "editsubnode", "delsubnode", "status", "create", "delete", "edit", "update", "help"}
 
 def main():
     cli_args = [a for a in sys.argv[1:] if not a.startswith("--")]

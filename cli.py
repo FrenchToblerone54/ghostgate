@@ -544,7 +544,8 @@ _COMMANDS = {
 }
 
 def dispatch(command, args):
-    load_dotenv(os.getenv("ENV_PATH", ".env"))
+    env_path = os.getenv("ENV_PATH") or ("/opt/ghostgate/.env" if os.path.exists("/opt/ghostgate/.env") else ".env")
+    load_dotenv(env_path)
     db.init_db()
     fn = _COMMANDS.get(command)
     if fn:
