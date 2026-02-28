@@ -527,7 +527,10 @@ def _build_app():
     token = os.getenv("BOT_TOKEN", "")
     proxy = os.getenv("BOT_PROXY", "")
     builder = ApplicationBuilder().token(token)
-    builder = builder.connect_timeout(30.0).read_timeout(30.0).write_timeout(30.0).pool_timeout(30.0).post_init(_post_init)
+    builder = (builder
+        .connect_timeout(10).read_timeout(15).write_timeout(15).pool_timeout(5)
+        .get_updates_connect_timeout(10).get_updates_read_timeout(35).get_updates_write_timeout(15).get_updates_pool_timeout(5)
+        .post_init(_post_init))
     if proxy:
         builder = builder.proxy(proxy).get_updates_proxy(proxy)
     application = builder.build()
@@ -559,7 +562,7 @@ async def _run_once():
             logger.warning(f"{name} failed/timed out: {e}")
     async with app:
         await app.start()
-        await app.updater.start_polling(drop_pending_updates=True)
+        await app.updater.start_polling(drop_pending_updates=True, timeout=10, bootstrap_retries=-1)
         watchdog_task = None
         idle_task = None
         async def _watchdog():
