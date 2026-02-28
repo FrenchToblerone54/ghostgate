@@ -31,11 +31,11 @@ Save the panel URL shown at the end — it is your admin panel access path.
 ## Bot Commands
 
 ```
-/create [--comment Name] [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none]
+/create [--comment Name] [--note X] [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none]
 /delete <id or comment>
 /stats <id or comment>
 /list [page]
-/edit <id or comment> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
+/edit <id or comment> [--comment X] [--note X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
 /regen <id or comment>
 /nodes
 ```
@@ -71,11 +71,11 @@ The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/subscriptions` | List subscriptions. Query params: `page`, `per_page` (0 = all), `search` |
+| `GET` | `/api/subscriptions` | List subscriptions. Query params: `page`, `per_page` (0 = all), `search`, `sort_by` (`used_bytes` or `expire_at`), `sort_dir` (`asc` or `desc`) |
 | `GET` | `/api/subscriptions/stream` | SSE stream — emits only changed/deleted subscriptions every 5s |
-| `POST` | `/api/subscriptions` | Create subscription and add to nodes. Body: `comment`, `data_gb`, `days`, `ip_limit`, `node_ids`, `show_multiplier`, `expire_after_first_use_seconds` |
+| `POST` | `/api/subscriptions` | Create subscription and add to nodes. Body: `comment`, `note`, `data_gb`, `days`, `ip_limit`, `node_ids`, `show_multiplier`, `expire_after_first_use_seconds` |
 | `GET` | `/api/subscriptions/<id>` | Get subscription with node list |
-| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `data_gb`, `days`, `ip_limit`, `enabled`, `show_multiplier`, `expire_after_first_use_seconds`, `remove_days`, `remove_expiry`, `remove_data_limit` |
+| `PUT` | `/api/subscriptions/<id>` | Update fields: `comment`, `note`, `data_gb`, `days`, `ip_limit`, `enabled`, `show_multiplier`, `expire_after_first_use_seconds`, `remove_days`, `remove_expiry`, `remove_data_limit` |
 | `DELETE` | `/api/subscriptions/<id>` | Delete subscription and remove clients from all nodes |
 | `GET` | `/api/subscriptions/<id>/stats` | Get traffic stats |
 | `GET` | `/api/subscriptions/<id>/qr` | QR code PNG for the subscription link |
@@ -87,6 +87,7 @@ The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the
 ```json
 {
   "comment": "John Doe",
+  "note": "Internal note (optional)",
   "data_gb": 10,
   "days": 30,
   "ip_limit": 2,
@@ -247,8 +248,8 @@ The CLI uses [rich](https://github.com/Textualize/rich) for colored terminal out
 | `ghostgate status` | Show system status (CPU, RAM, disk, uptime) |
 | `ghostgate list [--search X]` | List all subscriptions, with optional search filter |
 | `ghostgate stats <id\|comment>` | Show traffic stats for a subscription |
-| `ghostgate create --comment X [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | Create a new subscription |
-| `ghostgate edit <id\|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--ip N] [--enable] [--disable]` | Edit an existing subscription |
+| `ghostgate create --comment X [--note X] [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | Create a new subscription |
+| `ghostgate edit <id\|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--note X] [--ip N] [--enable] [--disable]` | Edit an existing subscription |
 | `ghostgate regen <id\|comment>` | Regenerate the subscription nanoid (old URL stops working) |
 | `ghostgate delete <id\|comment>` | Delete a subscription and remove its clients from all nodes |
 | `ghostgate nodes` | List all configured nodes |

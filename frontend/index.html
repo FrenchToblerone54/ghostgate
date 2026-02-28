@@ -113,6 +113,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .table-wrap{overflow-x:auto}
 .tbl{width:100%;border-collapse:collapse}
 .tbl th{text-align:left;padding:10px 14px;font-size:0.74em;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl th.sortable{cursor:pointer;user-select:none}.tbl th.sortable:hover{color:var(--text)}.tbl th.sort-asc::after{content:" ▲";color:var(--accent);font-size:0.8em}.tbl th.sort-desc::after{content:" ▼";color:var(--accent);font-size:0.8em}
 .tbl td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:0.87em;vertical-align:middle}
 .tbl tr:last-child td{border-bottom:none}
 .tbl tr:hover td{background:rgba(255,255,255,0.015)}
@@ -372,6 +373,7 @@ Refresh
 <button class="btn btn-accent" onclick="openCreate()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New</button>
 </div>
 <div style="display:flex;align-items:center;gap:8px">
+<button class="btn btn-ghost btn-sm" id="sort-reset-btn" style="display:none" onclick="resetSort()">Reset Sort</button>
 <select class="fi" id="per-page-sel" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="changePerPage(this.value)">
 <option value="10">10/page</option>
 <option value="20" selected>20/page</option>
@@ -388,8 +390,8 @@ Refresh
 <select class="fi" id="bulk-node" style="width:auto;flex:1;min-width:140px;max-width:220px"></select>
 <button class="btn btn-accent btn-sm" onclick="bulkNodes('add')">Add to Node</button>
 <button class="btn btn-danger btn-sm" onclick="bulkNodes('remove')">Remove from Node</button>
-<button class="btn btn-ghost btn-sm" onclick="bulkToggle(true)">Enable</button>
-<button class="btn btn-ghost btn-sm" onclick="bulkToggle(false)">Disable</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkToggle(true)">Enable Selected</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkToggle(false)">Disable Selected</button>
 <input class="fi" id="bulk-add-gb" type="number" min="0" step="0.1" placeholder="GB" style="width:72px;padding:5px 8px;font-size:0.82em">
 <button class="btn btn-ghost btn-sm" onclick="bulkExtend('data',1)">+Data</button>
 <button class="btn btn-danger btn-sm" onclick="bulkExtend('data',-1)">-Data</button>
@@ -404,7 +406,7 @@ Refresh
 <div class="card">
 <div class="table-wrap">
 <table class="tbl">
-<thead><tr><th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAllSubs(this.checked)" style="accent-color:var(--accent)"></th><th>ID</th><th>Comment</th><th>Data</th><th>Expires</th><th>Nodes</th><th>Status</th><th></th></tr></thead>
+<thead><tr><th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAllSubs(this.checked)" style="accent-color:var(--accent)"></th><th>ID</th><th>Comment</th><th id="th-data" class="sortable" onclick="sortSubs('used_bytes')">Data</th><th id="th-expires" class="sortable" onclick="sortSubs('expire_at')">Expires</th><th>Note</th><th>Nodes</th><th>Status</th><th></th></tr></thead>
 <tbody id="s-tbody"></tbody>
 </table>
 </div>
@@ -484,6 +486,7 @@ Refresh
 <div class="modal-bd">
 <div id="mc-alert" class="alert"></div>
 <div class="fg"><label class="fl">Comment / Name</label><input class="fi" id="mc-comment" placeholder="e.g. John Doe"></div>
+<div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="mc-note" placeholder="Internal note, leave blank to hide"></div>
 <div class="fr">
 <div class="fg"><label class="fl">Data Limit (GB, 0=∞)</label><input class="fi" id="mc-data" type="number" value="0" min="0" step="0.1"></div>
 <div class="fg"><label class="fl">Validity (days, 0=∞)</label><input class="fi" id="mc-days" type="number" value="30" min="0"></div>
@@ -507,6 +510,7 @@ Refresh
 <div class="modal-bd">
 <div id="me-alert" class="alert"></div>
 <div class="fg"><label class="fl">Comment</label><input class="fi" id="me-comment"></div>
+<div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="me-note" placeholder="Internal note, leave blank to hide"></div>
 <div class="fr">
 <div class="fg"><label class="fl">Data Limit (GB)</label><input class="fi" id="me-data" type="number" min="0" step="0.1"></div>
 <div class="fg"><label class="fl">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0"></div>
@@ -584,7 +588,7 @@ Refresh
 
 <script>
 const API="{{prefix}}";
-let sPage=1,sTotalPages=1,sSearch="",sTimer=null,sPerPage=20;
+let sPage=1,sTotalPages=1,sSearch="",sTimer=null,sPerPage=20,sSort=null,sSortDir="asc";
 let editingSubId=null,editingNodeId=null,editingNiId=null,editingInboundNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set(),_nodeOrder=[],detailSubId=null;
 let logStream=null,liveLog=false;
 let subsStream=null;
@@ -690,11 +694,13 @@ function onSearch(v){ clearTimeout(sTimer); sTimer=setTimeout(()=>{ sSearch=v; s
 
 async function loadSubs(){
   const qs=new URLSearchParams({page:sPage,per_page:sPerPage,search:sSearch||""});
+  if(sSort) { qs.set("sort_by",sSort); qs.set("sort_dir",sSortDir); }
   const r=await fetch(API+"/api/subscriptions?"+qs).then(x=>x.json());
   const subs=r.subs||[];
   sTotalPages=sPerPage===0?1:Math.max(1,Math.ceil(r.total/r.per_page));
   renderPag("pag-top"); renderPag("pag-bot");
-  if(subs.length===0){ document.getElementById("s-tbody").innerHTML='<tr><td colspan="8"><div class="empty-state"><p>No subscriptions found.</p></div></td></tr>'; return; }
+  updateSortHeaders();
+  if(subs.length===0){ document.getElementById("s-tbody").innerHTML='<tr><td colspan="9"><div class="empty-state"><p>No subscriptions found.</p></div></td></tr>'; return; }
   document.getElementById("s-tbody").innerHTML=subs.map(renderSubRow).join("");
 }
 function renderSubRow(sub){
@@ -718,12 +724,14 @@ function renderSubRow(sub){
   const firstuseDays=firstuseSec>0?Math.round(firstuseSec/86400):0;
   const expStr=sub.expire_at?sub.expire_at.substring(0,10):(firstuseSec>0?`${firstuseDays}d after 1st use`:"Never");
   const expTip=sub.expire_at?`Exact expiry: ${sub.expire_at}`:(firstuseSec>0?`Expiry starts after first use (${firstuseDays} days)`:"No expiry set");
+  const noteCell=sub.note?`<span style="font-size:0.82em;color:var(--text2)">${sub.note}</span>`:'';
   return `<tr data-sub-id="${sub.id}">
 <td><input type="checkbox" class="sub-chk" value="${sub.id}" onchange="toggleSubSel('${sub.id}',this.checked)" ${selectedSubs.has(sub.id)?"checked":""} style="accent-color:var(--accent)"></td>
 <td><span class="tbl-id">${sub.id.substring(0,12)}…</span></td>
 <td class="tbl-comment">${sub.comment||'<span style="color:var(--text3)">—</span>'}</td>
 <td>${dataCol}</td>
 <td style="font-size:0.84em;color:var(--text2);cursor:pointer" title="${expTip}" onclick="alert(this.title)">${expStr}</td>
+<td>${noteCell}</td>
 <td>${nodes}</td>
 <td>${statusBadge}</td>
 <td><div class="tbl-actions">
@@ -769,6 +777,7 @@ async function openCreate(){
   document.getElementById("mc-firstuse-days").querySelector("input").value="30";
   document.getElementById("mc-ip").value="0";
   document.getElementById("mc-submit").textContent="Create";
+  document.getElementById("mc-note").value="";
   document.getElementById("mc-sm").value="1";
   const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
   document.getElementById("mc-nodes").innerHTML=_renderInboundSelector(nodes,new Set());
@@ -777,6 +786,7 @@ async function openCreate(){
 
 async function submitCreate(){
   const comment=document.getElementById("mc-comment").value.trim();
+  const note=document.getElementById("mc-note").value.trim()||null;
   const data_gb=parseFloat(document.getElementById("mc-data").value)||0;
   const days=parseInt(document.getElementById("mc-days").value)||0;
   const firstuse_days=parseInt(document.getElementById("mc-firstuse-days").querySelector("input").value)||0;
@@ -787,7 +797,7 @@ async function submitCreate(){
   const btn=document.getElementById("mc-submit");
   btn.disabled=true; btn.textContent="Creating…";
   try{
-    const r=await fetch(API+"/api/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment,data_gb,days,ip_limit,node_ids,show_multiplier,expire_after_first_use_seconds})}).then(x=>x.json());
+    const r=await fetch(API+"/api/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment,note,data_gb,days,ip_limit,node_ids,show_multiplier,expire_after_first_use_seconds})}).then(x=>x.json());
     if(r.errors&&r.errors.length>0) showAlert("mc-alert","Created (with errors): "+r.errors.join("; "),"err");
     else { closeM("m-create"); loadSubs(); showAlert("s-alert","Subscription created: "+r.id,"ok"); }
   }catch(ex){ showAlert("mc-alert","Error: "+ex,"err"); }
@@ -818,6 +828,7 @@ async function viewSub(id){
   const rows=[
     ["ID",`<span class="tbl-id">${id}</span>`],
     ["Comment",sub.comment||"—"],
+    ...(sub.note?[["Note",sub.note]]:[]),
     ["Data Used",`<span title="${usedExact}" onclick="alert(this.title)" style="cursor:pointer">${used.toFixed(2)} GB / ${totalStr}</span>`],
     ["Expires",`<span title="${expExact}" onclick="alert(this.title)" style="cursor:pointer">${expStr}</span>`],
     ["IP Limit",sub.ip_limit||"Unlimited"],
@@ -855,6 +866,7 @@ async function editSub(id){
   editingSubId=id;
   const [sub, nodes]=await Promise.all([fetch(API+"/api/subscriptions/"+id).then(r=>r.json()),fetch(API+"/api/nodes").then(r=>r.json())]);
   document.getElementById("me-comment").value=sub.comment||"";
+  document.getElementById("me-note").value=sub.note||"";
   document.getElementById("me-data").value=sub.data_gb||0;
   document.getElementById("me-days").value=0; document.getElementById("me-days").disabled=false; _removeExpiry=false; document.getElementById("me-no-expire-btn").textContent="Set No Expiry"; document.getElementById("me-no-expire-btn").style.color="";
   document.getElementById("me-data").disabled=false; _removeDataLimit=false; document.getElementById("me-no-limit-btn").textContent="Set No Data Limit"; document.getElementById("me-no-limit-btn").style.color="";
@@ -892,7 +904,7 @@ function setNoDataLimit(){
 }
 async function submitEdit(){
   if(!editingSubId) return;
-  const body={comment:document.getElementById("me-comment").value.trim(),data_gb:_removeDataLimit?0:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
+  const body={comment:document.getElementById("me-comment").value.trim(),note:document.getElementById("me-note").value.trim()||null,data_gb:_removeDataLimit?0:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
   if(_removeExpiry){ body.remove_expiry=true; } else { const expDate=document.getElementById("me-expire-date").value; if(expDate){ body.expire_at=expDate; } else { const days=parseInt(document.getElementById("me-days").value)||0; if(days>0) body.days=days; else if(days<0) body.remove_days=-days; } }
   if(document.getElementById("me-firstuse").checked){ const d=parseInt(document.getElementById("me-firstuse-days").querySelector("input").value)||0; body.expire_after_first_use_seconds=Math.max(0,d*86400); } else { body.expire_after_first_use_seconds=0; }
   const checked=new Set([...document.querySelectorAll("#me-nodes input:checked")].map(i=>parseInt(i.value)));
@@ -936,6 +948,9 @@ async function updateBulkBar(){
 }
 
 function changePerPage(v){ sPerPage=parseInt(v); sPage=1; loadSubs(); }
+function sortSubs(col){ if(sSort===col) sSortDir=sSortDir==="asc"?"desc":"asc"; else { sSort=col; sSortDir="asc"; } sPage=1; loadSubs(); }
+function resetSort(){ sSort=null; sSortDir="asc"; sPage=1; loadSubs(); }
+function updateSortHeaders(){ document.getElementById("th-data").className=sSort==="used_bytes"?"sortable sort-"+sSortDir:"sortable"; document.getElementById("th-expires").className=sSort==="expire_at"?"sortable sort-"+sSortDir:"sortable"; document.getElementById("sort-reset-btn").style.display=sSort?"":"none"; }
 
 async function bulkDelete(){
   const n=selectedSubs.size;

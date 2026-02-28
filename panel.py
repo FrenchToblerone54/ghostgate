@@ -283,7 +283,11 @@ def register_routes(panel_path):
         page = int(request.args.get("page", 1))
         per_page = int(request.args.get("per_page", 20))
         search = request.args.get("search", "").strip() or None
-        subs, total = db.get_subs(page, per_page, search)
+        sort_by = request.args.get("sort_by", "").strip() or None
+        sort_dir = request.args.get("sort_dir", "asc").strip()
+        if sort_dir not in ("asc", "desc"):
+            sort_dir = "asc"
+        subs, total = db.get_subs(page, per_page, search, sort_by, sort_dir)
         for sub in subs:
             sub["node_names"] = [sn.get("inbound_name") or sn["name"] for sn in db.get_sub_nodes(sub["id"])]
         return jsonify({"subs": subs, "total": total, "page": page, "per_page": per_page})
@@ -323,13 +327,14 @@ def register_routes(panel_path):
     def api_subs_create():
         data = request.json
         comment = data.get("comment")
+        note = data.get("note") or None
         data_gb = float(data.get("data_gb", 0))
         days = int(data.get("days", 0))
         ip_limit = int(data.get("ip_limit", 0))
         show_multiplier = max(1, int(data.get("show_multiplier", 1)))
         expire_after_first_use_seconds = int(data.get("expire_after_first_use_seconds", 0))
         node_ids = [int(n) for n in data.get("node_ids", [])]
-        sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, expire_after_first_use_seconds=expire_after_first_use_seconds)
+        sub_id = db.create_sub(comment=comment, note=note, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, expire_after_first_use_seconds=expire_after_first_use_seconds)
         sub = db.get_sub(sub_id)
         client_uuid = str(uuid.uuid4())
         expire_ms = 0
@@ -372,7 +377,7 @@ def register_routes(panel_path):
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>", methods=["PUT"])
     def api_sub_update(sub_id):
         body = request.json
-        updates = {k: body[k] for k in ["comment", "data_gb", "days", "ip_limit", "enabled", "show_multiplier", "expire_after_first_use_seconds"] if k in body}
+        updates = {k: body[k] for k in ["comment", "note", "data_gb", "days", "ip_limit", "enabled", "show_multiplier", "expire_after_first_use_seconds"] if k in body}
         if body.get("remove_expiry"):
             updates["expire_at"] = None
         if "expire_after_first_use_seconds" in updates and int(updates.get("expire_after_first_use_seconds") or 0)>0:

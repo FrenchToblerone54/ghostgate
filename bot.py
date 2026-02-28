@@ -59,10 +59,10 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text(
         "GhostGate Bot\n\n"
-        "/create [--comment X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none]\n"
+        "/create [--comment X] [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none]\n"
         "/delete <id or comment>\n"
         "/stats <id or comment>\n"
-        "/edit <id or comment> [--comment X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]\n"
+        "/edit <id or comment> [--comment X] [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]\n"
         "/regen <id or comment>\n"
         "/list [page] — 10 per page\n"
         "/nodes\n"
@@ -83,6 +83,7 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         args = ctx.args or []
     opts = _parse_opts(args)
     comment = opts.get("comment")
+    note = opts.get("note") or None
     data_gb = float(opts.get("data", 0))
     days = int(opts.get("days", 0))
     firstuse_days = int(opts.get("firstuse-days", 0))
@@ -101,7 +102,7 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         node_ids = []
     else:
         node_ids = [int(x.strip()) for x in nodes_str.split(",") if x.strip().isdigit()]
-    sub_id = db.create_sub(comment=comment, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, expire_after_first_use_seconds=expire_after_first_use_seconds)
+    sub_id = db.create_sub(comment=comment, note=note, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, expire_after_first_use_seconds=expire_after_first_use_seconds)
     sub = db.get_sub(sub_id)
     client_uuid = str(uuid.uuid4())
     expire_ms = 0
@@ -236,6 +237,8 @@ async def cmd_edit(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     updates = {}
     if "comment" in opts:
         updates["comment"] = opts["comment"]
+    if "note" in opts:
+        updates["note"] = opts["note"] or None
     if "data" in opts:
         updates["data_gb"] = float(opts["data"])
     if "days" in opts:

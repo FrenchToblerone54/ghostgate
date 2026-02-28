@@ -18,7 +18,7 @@ def _conn():
     finally:
         c.close()
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 def init_db():
     with _conn() as c:
@@ -54,6 +54,7 @@ CREATE TABLE node_inbounds (
 CREATE TABLE subscriptions (
     id TEXT PRIMARY KEY,
     comment TEXT,
+    note TEXT,
     data_gb REAL DEFAULT 0,
     days INTEGER DEFAULT 0,
     ip_limit INTEGER DEFAULT 0,
@@ -102,6 +103,7 @@ CREATE TABLE IF NOT EXISTS nodes (
 CREATE TABLE IF NOT EXISTS subscriptions (
     id TEXT PRIMARY KEY,
     comment TEXT,
+    note TEXT,
     data_gb REAL DEFAULT 0,
     days INTEGER DEFAULT 0,
     ip_limit INTEGER DEFAULT 0,
@@ -197,6 +199,10 @@ FROM nodes n""")
                 c.execute('ALTER TABLE node_inbounds ADD COLUMN "order" INTEGER DEFAULT 0')
                 c.execute('UPDATE node_inbounds SET "order" = id')
             c.execute("PRAGMA user_version=5")
+        if user_ver < 6:
+            if not _col_exists("subscriptions", "note"):
+                c.execute("ALTER TABLE subscriptions ADD COLUMN note TEXT")
+            c.execute("PRAGMA user_version=6")
 
 def add_node(name, address, username, password, proxy_url=None):
     with _conn() as c:
@@ -277,23 +283,31 @@ def delete_node_inbound(ni_id):
     with _conn() as c:
         c.execute("DELETE FROM node_inbounds WHERE id=?", (ni_id,))
 
-def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True, show_multiplier=1, expire_after_first_use_seconds=0):
+def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True, show_multiplier=1, expire_after_first_use_seconds=0, note=None):
     sub_id = sub_id or generate(size=20)
     expire_at = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat() if days > 0 and not expire_after_first_use_seconds else None
     with _conn() as c:
         c.execute(
-            "INSERT INTO subscriptions (id, comment, data_gb, days, ip_limit, expire_at, enabled, show_multiplier, expire_after_first_use_seconds) VALUES (?,?,?,?,?,?,?,?,?)",
-            (sub_id, comment, data_gb, days, ip_limit, expire_at, int(enabled), max(1, int(show_multiplier)), int(expire_after_first_use_seconds))
+            "INSERT INTO subscriptions (id, comment, note, data_gb, days, ip_limit, expire_at, enabled, show_multiplier, expire_after_first_use_seconds) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (sub_id, comment, note or None, data_gb, days, ip_limit, expire_at, int(enabled), max(1, int(show_multiplier)), int(expire_after_first_use_seconds))
         )
     return sub_id
 
-def get_subs(page=1, per_page=20, search=None):
+def get_subs(page=1, per_page=20, search=None, sort_by=None, sort_dir="asc"):
     limit = per_page if per_page > 0 else -1
     offset = (page - 1) * per_page if per_page > 0 else 0
+    _ok = {"used_bytes": "used_bytes", "expire_at": "expire_at"}
+    col = _ok.get(sort_by)
+    if col == "expire_at":
+        order = f"CASE WHEN expire_at IS NULL THEN 1 ELSE 0 END, expire_at {'ASC' if sort_dir == 'asc' else 'DESC'}"
+    elif col:
+        order = f"{col} {'ASC' if sort_dir == 'asc' else 'DESC'}"
+    else:
+        order = "created_at DESC"
     with _conn() as c:
         if search:
             rows = c.execute(
-                "SELECT * FROM subscriptions WHERE id LIKE ? OR comment LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                f"SELECT * FROM subscriptions WHERE id LIKE ? OR comment LIKE ? ORDER BY {order} LIMIT ? OFFSET ?",
                 (f"%{search}%", f"%{search}%", limit, offset)
             ).fetchall()
             total = c.execute(
@@ -302,7 +316,7 @@ def get_subs(page=1, per_page=20, search=None):
             ).fetchone()[0]
         else:
             rows = c.execute(
-                "SELECT * FROM subscriptions ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                f"SELECT * FROM subscriptions ORDER BY {order} LIMIT ? OFFSET ?",
                 (limit, offset)
             ).fetchall()
             total = c.execute("SELECT COUNT(*) FROM subscriptions").fetchone()[0]
@@ -319,7 +333,7 @@ def get_sub_by_comment(comment):
         return dict(r) if r else None
 
 def update_sub(sub_id, **kwargs):
-    allowed = {"comment", "data_gb", "days", "ip_limit", "used_bytes", "expire_at", "enabled", "show_multiplier", "expire_after_first_use_seconds"}
+    allowed = {"comment", "note", "data_gb", "days", "ip_limit", "used_bytes", "expire_at", "enabled", "show_multiplier", "expire_after_first_use_seconds"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if "days" in kwargs and kwargs["days"] > 0 and "expire_at" not in kwargs and not fields.get("expire_after_first_use_seconds"):
         fields["expire_at"] = (datetime.now(timezone.utc) + timedelta(days=int(kwargs["days"]))).isoformat()
