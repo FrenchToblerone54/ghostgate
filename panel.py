@@ -186,12 +186,15 @@ def sub_page(sub_id):
         with open(os.path.join(base_dir, "frontend", "sub.html")) as f:
             tmpl = f.read()
         sub_enabled = bool(sub.get("enabled", 1))
+        expire_exact = f"Exact expiry: {sub['expire_at']}" if sub.get("expire_at") else (f"Expiry starts after first use ({int(sub.get('expire_after_first_use_seconds',0))//86400} days)" if int(sub.get("expire_after_first_use_seconds",0))>0 else "No expiry set")
+        data_tip = f"Used: {total_bytes:,} bytes ({total_bytes/1073741824:.4f} GB)\nLimit: {limit_bytes:,} bytes ({sub['data_gb']} GB)\n{data_percent}% consumed" if limit_bytes>0 else f"Used: {total_bytes:,} bytes ({total_bytes/1073741824:.4f} GB)\nLimit: Unlimited"
         return render_template_string(tmpl,
             sub_url=sub_url, qr_b64=qr_b64,
             data_used_str=data_used_str, data_total_str=data_total_str, data_percent=data_percent,
             expire_str=expire_str, is_expired=is_expired, is_over_limit=is_over_limit,
             sub_enabled=sub_enabled,
-            data_label=data_label, expire_label=expire_label
+            data_label=data_label, expire_label=expire_label,
+            expire_exact=expire_exact, data_tip=data_tip
         )
     configs = [
         f"vless://00000000-0000-0000-0000-000000000001@0.0.0.0:443?type=tcp#{quote(f'{data_label}: {total_bytes*sm/1073741824:.2f} GB / {data_total_str}')}",
