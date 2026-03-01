@@ -464,6 +464,23 @@ def cmd_edit(args):
     console.print(f"[{ACC}]Updated: {sub.get('comment') or sub['id']}[/]")
     cmd_stats([sub["id"]])
 
+def cmd_bulknote(args):
+    opts = _parse_opts(args)
+    ids = [a for a in args if not a.startswith("--")]
+    if not ids:
+        console.print(f"[{DANGER}]Usage: ghostgate bulknote <id|comment> [<id|comment> ...] [--note X][/]")
+        return
+    note = opts.get("note") or None
+    updated = 0
+    for key in ids:
+        sub = db.get_sub(key) or db.get_sub_by_comment(key)
+        if not sub:
+            console.print(f"[{WARN}]Not found: {key}[/]")
+            continue
+        db.update_sub(sub["id"], note=note)
+        updated += 1
+    console.print(f"[{ACC}]{'Set note on' if note else 'Cleared note from'} {updated} subscription(s)[/]")
+
 def cmd_regen(args):
     from xui_client import XUIClient
     from nanoid import generate
@@ -515,6 +532,7 @@ def cmd_help(args):
         f"  [{ACC}]stats[/] [{MUTED}]<id|comment>[/]                         Show detailed subscription info",
         f"  [{ACC}]create[/] [{MUTED}][--id X] --comment X [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none][/]",
         f"  [{ACC}]edit[/] [{MUTED}]<id|comment> [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--note X] [--ip N] [--enable] [--disable][/]",
+        f"  [{ACC}]bulknote[/] [{MUTED}]<id|comment> [...] [--note X][/]          Set or clear note on multiple subscriptions",
         f"  [{ACC}]regen[/] [{MUTED}]<id|comment>[/]                         Regenerate subscription nanoid",
         f"  [{ACC}]delete[/] [{MUTED}]<id|comment>[/]                         Delete subscription",
         f"  [{ACC}]nodes[/]                                       List nodes",
@@ -537,6 +555,7 @@ _COMMANDS = {
     "create": cmd_create,
     "delete": cmd_delete,
     "edit": cmd_edit,
+    "bulknote": cmd_bulknote,
     "regen": cmd_regen,
     "addsubnode": cmd_addsubnode,
     "editsubnode": cmd_editsubnode,

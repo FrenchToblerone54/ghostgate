@@ -400,6 +400,8 @@ Refresh
 <button class="btn btn-danger btn-sm" onclick="bulkExtend('days',-1)">-Days</button>
 <button class="btn btn-ghost btn-sm" onclick="bulkNoExpiry()">No Expiry</button>
 <button class="btn btn-ghost btn-sm" onclick="bulkNoDataLimit()">No Limit</button>
+<input class="fi" id="bulk-note" type="text" placeholder="note" style="width:110px;padding:5px 8px;font-size:0.82em">
+<button class="btn btn-ghost btn-sm" onclick="bulkSetNote()">Set Note</button>
 <button class="btn btn-danger btn-sm" onclick="bulkDelete()">Delete</button>
 <button class="btn btn-ghost btn-sm" onclick="clearBulk()">Clear</button>
 </div>
@@ -486,7 +488,7 @@ Refresh
 <div class="modal-bd">
 <div id="mc-alert" class="alert"></div>
 <div class="fg"><label class="fl">Comment / Name</label><input class="fi" id="mc-comment" placeholder="e.g. John Doe"></div>
-<div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="mc-note" placeholder="Internal note, leave blank to hide"></div>
+<div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="mc-note" placeholder="Note, leave blank to hide"></div>
 <div class="fr">
 <div class="fg"><label class="fl">Data Limit (GB, 0=∞)</label><input class="fi" id="mc-data" type="number" value="0" min="0" step="0.1"></div>
 <div class="fg"><label class="fl">Validity (days, 0=∞)</label><input class="fi" id="mc-days" type="number" value="30" min="0"></div>
@@ -510,7 +512,7 @@ Refresh
 <div class="modal-bd">
 <div id="me-alert" class="alert"></div>
 <div class="fg"><label class="fl">Comment</label><input class="fi" id="me-comment"></div>
-<div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="me-note" placeholder="Internal note, leave blank to hide"></div>
+<div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="me-note" placeholder="Note, leave blank to hide"></div>
 <div class="fr">
 <div class="fg"><label class="fl">Data Limit (GB)</label><input class="fi" id="me-data" type="number" min="0" step="0.1"></div>
 <div class="fg"><label class="fl">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0"></div>
@@ -992,6 +994,13 @@ async function bulkNoDataLimit(){
   if(!n) return;
   await fetch(API+"/api/bulk/extend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],remove_data_limit:true})});
   clearBulk(); loadSubs(); showAlert("s-alert","Removed data limit from "+n+" subscriptions","ok");
+}
+async function bulkSetNote(){
+  const n=selectedSubs.size;
+  if(!n) return;
+  const note=document.getElementById("bulk-note").value.trim()||null;
+  await fetch(API+"/api/bulk/note",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],note})});
+  clearBulk(); loadSubs(); showAlert("s-alert",(note?"Set note on ":"Cleared note from ")+n+" subscriptions","ok");
 }
 async function checkUpdate(){
   document.getElementById("upd-status").textContent="Checking...";

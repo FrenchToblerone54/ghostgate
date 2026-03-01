@@ -63,6 +63,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/delete <id or comment>\n"
         "/stats <id or comment>\n"
         "/edit <id or comment> [--comment X] [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]\n"
+        "/bulknote <id or comment> [...] [--note X]\n"
         "/regen <id or comment>\n"
         "/list [page] — 10 per page\n"
         "/nodes\n"
@@ -460,6 +461,35 @@ async def cmd_subnodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text("\n".join(lines))
 
+async def cmd_bulknote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Usage: /bulknote <id or comment> [<id or comment> ...] [--note X]\nOmit --note to clear.")
+        return
+    all_args = list(ctx.args)
+    opts = _parse_opts(all_args)
+    note = opts.get("note") or None
+    ids = []
+    i = 0
+    while i < len(all_args):
+        if all_args[i].startswith("--"):
+            i += 2 if i+1 < len(all_args) and not all_args[i+1].startswith("--") else 1
+        else:
+            ids.append(all_args[i])
+            i += 1
+    if not ids:
+        await update.message.reply_text("No subscription IDs provided.")
+        return
+    updated = 0
+    for key in ids:
+        sub = db.get_sub(key) or db.get_sub_by_comment(key)
+        if not sub:
+            continue
+        db.update_sub(sub["id"], note=note)
+        updated += 1
+    await update.message.reply_text(("Set note on" if note else "Cleared note from") + f" {updated} subscription(s).")
+
 async def cmd_regen(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update.effective_user.id):
         return
@@ -516,6 +546,7 @@ async def _post_init(app):
         ("stats", "Subscription stats"),
         ("list", "List subscriptions (10/page)"),
         ("edit", "Edit subscription"),
+        ("bulknote", "Set/clear note on multiple subscriptions"),
         ("regen", "Regenerate subscription nanoid"),
         ("nodes", "List nodes"),
         ("addnode", "Add a node"),
@@ -545,6 +576,7 @@ def _build_app():
     application.add_handler(CommandHandler("stats", cmd_stats))
     application.add_handler(CommandHandler("list", cmd_list))
     application.add_handler(CommandHandler("edit", cmd_edit))
+    application.add_handler(CommandHandler("bulknote", cmd_bulknote))
     application.add_handler(CommandHandler("regen", cmd_regen))
     application.add_handler(CommandHandler("nodes", cmd_nodes))
     application.add_handler(CommandHandler("addnode", cmd_addnode))

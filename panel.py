@@ -199,6 +199,7 @@ def sub_page(sub_id):
     configs = [
         f"vless://00000000-0000-0000-0000-000000000001@0.0.0.0:443?type=tcp#{quote(f'{data_label}: {total_bytes*sm/1073741824:.2f} GB / {data_total_str}')}",
         f"vless://00000000-0000-0000-0000-000000000002@0.0.0.0:443?type=tcp#{quote(f'{expire_label}: {expire_str}')}",
+        *([f"vless://00000000-0000-0000-0000-000000000003@0.0.0.0:443?type=tcp#{quote(sub['note'])}"] if sub.get("note") else []),
     ]
     for sn in snodes:
         try:
@@ -644,6 +645,15 @@ def register_routes(panel_path):
                     xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], enabled_val)
                 except Exception:
                     pass
+        return jsonify({"ok": True})
+
+    @app.route(f"/{panel_path}/api/bulk/note", methods=["POST"])
+    def api_bulk_note():
+        data = request.json
+        sub_ids = data.get("sub_ids", [])
+        note = data.get("note") or None
+        for sub_id in sub_ids:
+            db.update_sub(sub_id, note=note)
         return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/regen-id", methods=["POST"])
