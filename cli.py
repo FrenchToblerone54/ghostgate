@@ -226,6 +226,36 @@ def cmd_subnodes(args):
         return
     console.print(Panel("\n".join(lines), title=f"[bold white]Sub-nodes[/]", border_style=DIM, padding=(0, 1)))
 
+def cmd_editnode(args):
+    if not args:
+        console.print(f"[{DANGER}]Usage: ghostgate editnode <node_id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable][/]")
+        return
+    try:
+        node_id = int(args[0])
+    except ValueError:
+        console.print(f"[{DANGER}]Node ID must be a number.[/]")
+        return
+    node = db.get_node(node_id)
+    if not node:
+        console.print(f"[{DANGER}]Node not found: {node_id}[/]")
+        return
+    opts = _parse_opts(args[1:])
+    updates = {}
+    if "name" in opts: updates["name"] = opts["name"]
+    if "addr" in opts: updates["address"] = opts["addr"]
+    if "user" in opts: updates["username"] = opts["user"]
+    if "pass" in opts: updates["password"] = opts["pass"]
+    if "proxy" in opts: updates["proxy_url"] = opts["proxy"] or None
+    if "enable" in opts: updates["enabled"] = 1
+    if "disable" in opts: updates["enabled"] = 0
+    if not updates:
+        console.print(f"[{WARN}]No valid changes provided.[/]")
+        return
+    db.update_node(node_id, **updates)
+    updated = db.get_node(node_id)
+    st = f"[{ACC}]On[/]" if updated.get("enabled") else f"[{DANGER}]Off[/]"
+    console.print(f"[{ACC}]Updated node:[/] [{MUTED}][{node_id}][/] {updated['name']}  {st}")
+
 def cmd_addsubnode(args):
     opts = _parse_opts(args)
     if "node" not in opts or "inbound" not in opts:
@@ -536,6 +566,7 @@ def cmd_help(args):
         f"  [{ACC}]regen[/] [{MUTED}]<id|comment>[/]                         Regenerate subscription nanoid",
         f"  [{ACC}]delete[/] [{MUTED}]<id|comment>[/]                         Delete subscription",
         f"  [{ACC}]nodes[/]                                       List nodes",
+        f"  [{ACC}]editnode[/] [{MUTED}]<id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable|--disable][/]",
         f"  [{ACC}]subnodes[/] [{MUTED}][node_id][/]                          List sub-nodes",
         f"  [{ACC}]addsubnode[/] [{MUTED}]--node N --inbound N [--name X] [--multiplier N][/]",
         f"  [{ACC}]editsubnode[/] [{MUTED}]<id> [--name X] [--inbound N] [--multiplier N] [--enable|--disable][/]",
@@ -549,6 +580,7 @@ _COMMANDS = {
     "list": cmd_list,
     "stats": cmd_stats,
     "nodes": cmd_nodes,
+    "editnode": cmd_editnode,
     "subnodes": cmd_subnodes,
     "listsubnode": cmd_subnodes,
     "status": cmd_status,

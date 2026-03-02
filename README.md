@@ -38,6 +38,7 @@ Save the panel URL shown at the end — it is your admin panel access path.
 /edit <id or comment> [--comment X] [--note X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
 /regen <id or comment>
 /nodes
+/editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]
 ```
 
 ## Configuration
@@ -113,7 +114,7 @@ The `errors` array lists any nodes that failed to receive the client — the sub
 |---|---|---|
 | `GET` | `/api/nodes` | List all nodes (password omitted) |
 | `POST` | `/api/nodes` | Add a node |
-| `PUT` | `/api/nodes/<id>` | Update node fields |
+| `PUT` | `/api/nodes/<id>` | Update node fields. Supports `enabled` (0 or 1) to disable/enable the node |
 | `DELETE` | `/api/nodes/<id>` | Delete a node |
 | `GET` | `/api/nodes/<id>/test` | Test connection and inbound reachability |
 
@@ -261,6 +262,7 @@ The CLI uses [rich](https://github.com/Textualize/rich) for colored terminal out
 | `ghostgate regen <id\|comment>` | Regenerate the subscription nanoid (old URL stops working) |
 | `ghostgate delete <id\|comment>` | Delete a subscription and remove its clients from all nodes |
 | `ghostgate nodes` | List all configured nodes |
+| `ghostgate editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]` | Edit or enable/disable a node |
 | `ghostgate update` | Check for an update and apply it if available |
 
 **Examples:**
@@ -276,6 +278,8 @@ ghostgate edit abc123 --disable
 ghostgate regen abc123
 ghostgate delete abc123
 ghostgate nodes
+ghostgate editnode 1 --disable
+ghostgate editnode 1 --enable
 ghostgate status
 ghostgate update
 ghostgate --version

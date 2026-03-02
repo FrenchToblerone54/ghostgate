@@ -48,6 +48,7 @@ sudo ./install.sh
 /edit <آیدی یا کامنت> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
 /regen <آیدی یا کامنت>
 /nodes
+/editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]
 ```
 
 ## تنظیمات
@@ -120,7 +121,7 @@ sudo ./install.sh
 |---|---|---|
 | `GET` | `/api/nodes` | لیست تمام نودها (بدون رمز عبور) |
 | `POST` | `/api/nodes` | افزودن نود |
-| `PUT` | `/api/nodes/<id>` | ویرایش فیلدهای نود |
+| `PUT` | `/api/nodes/<id>` | ویرایش فیلدهای نود. پشتیبانی از `enabled` (0 یا 1) برای غیرفعال/فعال کردن نود |
 | `DELETE` | `/api/nodes/<id>` | حذف نود |
 | `GET` | `/api/nodes/<id>/test` | تست اتصال و دسترسی به inbound |
 
@@ -260,6 +261,7 @@ sudo journalctl -u ghostgate -f
 | `ghostgate regen <آیدی\|کامنت>` | بازسازی nanoid اشتراک (لینک قدیمی از کار می‌افتد) |
 | `ghostgate delete <آیدی\|کامنت>` | حذف اشتراک و حذف کلاینت‌های آن از تمام نودها |
 | `ghostgate nodes` | لیست تمام نودهای تنظیم‌شده |
+| `ghostgate editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]` | ویرایش یا فعال/غیرفعال کردن نود |
 | `ghostgate update` | بررسی به‌روزرسانی و اعمال آن در صورت وجود |
 
 **مثال‌ها:**
@@ -275,6 +277,8 @@ ghostgate edit abc123 --disable
 ghostgate regen abc123
 ghostgate delete abc123
 ghostgate nodes
+ghostgate editnode 1 --disable
+ghostgate editnode 1 --enable
 ghostgate status
 ghostgate update
 ghostgate --version

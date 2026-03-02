@@ -68,6 +68,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/list [page] — 10 per page\n"
         "/nodes\n"
         "/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...] [--multiplier N]\n"
+        "/editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]\n"
         "/delnode <id>\n"
         "/subnodes [node_id]\n"
         "/addsubnode --node N --inbound N [--name X] [--multiplier N]\n"
@@ -315,6 +316,42 @@ async def cmd_delnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     db.delete_node(node_id)
     await update.message.reply_text(f"Deleted node: [{node_id}] {node['name']}")
 
+async def cmd_editnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Usage: /editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]")
+        return
+    try:
+        all_args = shlex.split(" ".join(ctx.args))
+    except Exception:
+        all_args = ctx.args
+    try:
+        node_id = int(all_args[0])
+    except ValueError:
+        await update.message.reply_text("Node ID must be a number.")
+        return
+    node = db.get_node(node_id)
+    if not node:
+        await update.message.reply_text("Node not found.")
+        return
+    opts = _parse_opts(all_args[1:])
+    updates = {}
+    if "name" in opts: updates["name"] = opts["name"]
+    if "addr" in opts: updates["address"] = opts["addr"]
+    if "user" in opts: updates["username"] = opts["user"]
+    if "pass" in opts: updates["password"] = opts["pass"]
+    if "proxy" in opts: updates["proxy_url"] = opts["proxy"] or None
+    if "enable" in opts: updates["enabled"] = 1
+    if "disable" in opts: updates["enabled"] = 0
+    if not updates:
+        await update.message.reply_text("No valid changes provided.")
+        return
+    db.update_node(node_id, **updates)
+    updated = db.get_node(node_id)
+    st = "on" if updated and updated.get("enabled") else "off"
+    await update.message.reply_text(f"Updated node: [{node_id}] {updated['name']} ({st})")
+
 async def cmd_addsubnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update.effective_user.id):
         return
@@ -550,6 +587,7 @@ async def _post_init(app):
         ("regen", "Regenerate subscription nanoid"),
         ("nodes", "List nodes"),
         ("addnode", "Add a node"),
+        ("editnode", "Edit or enable/disable a node"),
         ("delnode", "Delete a node"),
         ("subnodes", "List sub-nodes"),
         ("addsubnode", "Add sub-node"),
@@ -580,6 +618,7 @@ def _build_app():
     application.add_handler(CommandHandler("regen", cmd_regen))
     application.add_handler(CommandHandler("nodes", cmd_nodes))
     application.add_handler(CommandHandler("addnode", cmd_addnode))
+    application.add_handler(CommandHandler("editnode", cmd_editnode))
     application.add_handler(CommandHandler("delnode", cmd_delnode))
     application.add_handler(CommandHandler("subnodes", cmd_subnodes))
     application.add_handler(CommandHandler("listsubnode", cmd_subnodes))
