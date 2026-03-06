@@ -135,6 +135,40 @@ def _fmt_vmess(client_uuid, label, server, port, stream_settings, security):
         obj["host"] = s.get("host", "")
     return "vmess://" + base64.b64encode(json.dumps(obj, separators=(",", ":")).encode()).decode()
 
+def _build_sub_configs(sub_id):
+    snodes = db.get_sub_nodes(sub_id)
+    result = []
+    for sn in snodes:
+        try:
+            xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+            inbound = xui.get_inbound(sn["inbound_id"])
+            if not inbound:
+                continue
+            stream = json.loads(inbound.get("streamSettings", "{}"))
+            proto = inbound.get("protocol", "vless").lower()
+            orig_security = stream.get("security", "none")
+            orig_port = inbound.get("port", 443)
+            raw_addr = sn["address"].split("//")[-1].split("/")[0]
+            orig_server = raw_addr.split(":")[0]
+            _fmt = _fmt_vmess if proto == "vmess" else _fmt_vless
+            ext_proxies = stream.get("externalProxy") or []
+            if ext_proxies:
+                for i, ep in enumerate(ext_proxies):
+                    ep_server = ep.get("dest", orig_server)
+                    ep_port = ep.get("port", orig_port)
+                    force_tls = ep.get("forceTls", "same")
+                    ep_security = orig_security if force_tls == "same" else force_tls
+                    ep_stream = dict(stream)
+                    ep_stream["security"] = ep_security
+                    label = f"{sn.get('inbound_name') or sn['name']}-{i+1}" if i > 0 else (sn.get("inbound_name") or sn["name"])
+                    result.append({"node": label, "config": _fmt(sn["client_uuid"], label, ep_server, ep_port, ep_stream, ep_security)})
+            else:
+                label = sn.get("inbound_name") or sn["name"]
+                result.append({"node": label, "config": _fmt(sn["client_uuid"], label, orig_server, orig_port, stream, orig_security)})
+        except Exception:
+            pass
+    return result
+
 def _make_qr_b64(text):
     qr = qrcode.QRCode(box_size=6, border=2)
     qr.add_data(text)
@@ -152,7 +186,6 @@ def sub_page(sub_id):
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
     ua = request.headers.get("User-Agent", "")
     db.log_access(sub_id, ip, ua)
-    snodes = db.get_sub_nodes(sub_id)
     base_url = BASE_URL or request.host_url.rstrip("/")
     sub_url = f"{base_url}/sub/{sub_id}"
     sm = max(1, int(sub.get("show_multiplier") or 1))
@@ -201,34 +234,8 @@ def sub_page(sub_id):
         f"vless://00000000-0000-0000-0000-000000000002@0.0.0.0:443?type=tcp#{quote(f'{expire_label}: {expire_str}')}",
         *([f"vless://00000000-0000-0000-0000-000000000003@0.0.0.0:443?type=tcp#{quote(sub['note'])}"] if sub.get("note") else []),
     ]
-    for sn in snodes:
-        try:
-            xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
-            inbound = xui.get_inbound(sn["inbound_id"])
-            if not inbound:
-                continue
-            stream = json.loads(inbound.get("streamSettings", "{}"))
-            proto = inbound.get("protocol", "vless").lower()
-            orig_security = stream.get("security", "none")
-            orig_port = inbound.get("port", 443)
-            raw_addr = sn["address"].split("//")[-1].split("/")[0]
-            orig_server = raw_addr.split(":")[0]
-            _fmt = _fmt_vmess if proto == "vmess" else _fmt_vless
-            ext_proxies = stream.get("externalProxy") or []
-            if ext_proxies:
-                for i, ep in enumerate(ext_proxies):
-                    ep_server = ep.get("dest", orig_server)
-                    ep_port = ep.get("port", orig_port)
-                    force_tls = ep.get("forceTls", "same")
-                    ep_security = orig_security if force_tls == "same" else force_tls
-                    ep_stream = dict(stream)
-                    ep_stream["security"] = ep_security
-                    label = f"{sn.get('inbound_name') or sn['name']}-{i+1}" if i > 0 else (sn.get("inbound_name") or sn["name"])
-                    configs.append(_fmt(sn["client_uuid"], label, ep_server, ep_port, ep_stream, ep_security))
-            else:
-                configs.append(_fmt(sn["client_uuid"], sn.get("inbound_name") or sn["name"], orig_server, orig_port, stream, orig_security))
-        except Exception:
-            pass
+    for entry in _build_sub_configs(sub_id):
+        configs.append(entry["config"])
     profile_title = os.getenv("PROFILE_TITLE", "GhostGate Subscription")
     headers = {
         "Content-Type": "text/plain; charset=utf-8",
@@ -689,6 +696,12 @@ def register_routes(panel_path):
         img.save(buf, format="PNG")
         buf.seek(0)
         return Response(buf.read(), content_type="image/png")
+
+    @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/configs")
+    def api_sub_configs(sub_id):
+        if not db.get_sub(sub_id):
+            return jsonify({"error": "not found"}), 404
+        return jsonify(_build_sub_configs(sub_id))
 
     @app.route(f"/{panel_path}/api/nodes")
     def api_nodes_list():

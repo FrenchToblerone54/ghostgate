@@ -52,8 +52,17 @@ if [ ! -f /opt/ghostgate/.env ]; then
 
     echo ""
     echo "Telegram Bot Setup"
-    read -p "Bot Token (from @BotFather): " BOT_TOKEN
-    read -p "Admin Telegram User ID: " ADMIN_ID
+    read -p "Enable Telegram bot? [Y/n]: " BOT_ENABLED_INPUT
+    BOT_ENABLED_INPUT=${BOT_ENABLED_INPUT:-y}
+    if [[ $BOT_ENABLED_INPUT =~ ^[Yy]$ ]]; then
+        BOT_ENABLED="true"
+        read -p "Bot Token (from @BotFather): " BOT_TOKEN
+        read -p "Admin Telegram User ID: " ADMIN_ID
+    else
+        BOT_ENABLED="false"
+        BOT_TOKEN=""
+        ADMIN_ID=""
+    fi
 
     echo ""
     echo "Server Settings"
@@ -87,6 +96,7 @@ if [ ! -f /opt/ghostgate/.env ]; then
 
     cat > /opt/ghostgate/.env <<EOF
 BASE_URL=${BASE_URL}
+BOT_ENABLED=${BOT_ENABLED}
 BOT_TOKEN=${BOT_TOKEN}
 ADMIN_ID=${ADMIN_ID}
 PANEL_PATH=${PANEL_PATH}

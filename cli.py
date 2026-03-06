@@ -571,10 +571,31 @@ def cmd_help(args):
         f"  [{ACC}]addsubnode[/] [{MUTED}]--node N --inbound N [--name X] [--multiplier N][/]",
         f"  [{ACC}]editsubnode[/] [{MUTED}]<id> [--name X] [--inbound N] [--multiplier N] [--enable|--disable][/]",
         f"  [{ACC}]delsubnode[/] [{MUTED}]<id>[/]                              Delete sub-node",
+        f"  [{ACC}]configs[/] [{MUTED}]<id or comment>[/]                       Show per-node config URLs for a subscription",
         f"  [{ACC}]status[/]                                      System overview",
         f"  [{ACC}]update[/]                                      Check and apply update",
     ]
     console.print(Panel("\n".join(lines), title=f"[bold white]GhostGate CLI[/]  [{MUTED}]v{updater.VERSION}[/]", border_style=DIM, padding=(0, 1)))
+
+def cmd_configs(args):
+    if not args:
+        console.print(f"[{DANGER}]Usage: ghostgate configs <id or comment>[/]")
+        return
+    identifier = " ".join(args)
+    sub = db.get_sub(identifier) or db.get_sub_by_comment(identifier)
+    if not sub:
+        console.print(f"[{DANGER}]Subscription not found: {identifier}[/]")
+        return
+    from panel import _build_sub_configs
+    configs = _build_sub_configs(sub["id"])
+    if not configs:
+        console.print(f"[{MUTED}]No configs available for this subscription.[/]")
+        return
+    lines = []
+    for c in configs:
+        lines.append(f"[bold white]{c['node']}[/]")
+        lines.append(f"  [{ACC}]{c['config']}[/]")
+    console.print(Panel("\n".join(lines), title=f"[bold white]Configs: {sub.get('comment') or sub['id']}[/]", border_style=DIM, padding=(0, 1)))
 
 _COMMANDS = {
     "list": cmd_list,
@@ -589,6 +610,7 @@ _COMMANDS = {
     "edit": cmd_edit,
     "bulknote": cmd_bulknote,
     "regen": cmd_regen,
+    "configs": cmd_configs,
     "addsubnode": cmd_addsubnode,
     "editsubnode": cmd_editsubnode,
     "delsubnode": cmd_delsubnode,

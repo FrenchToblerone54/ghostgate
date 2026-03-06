@@ -60,7 +60,7 @@ def _migrate(old_db_path, node_id):
     conn.close()
     print(f"Migrated {count}/{len(configs)} subscriptions from {old_db_path}")
 
-_CLI_COMMANDS = {"list", "stats", "nodes", "subnodes", "listsubnode", "addsubnode", "editsubnode", "delsubnode", "status", "create", "delete", "edit", "update", "help"}
+_CLI_COMMANDS = {"list", "stats", "nodes", "subnodes", "listsubnode", "addsubnode", "editsubnode", "delsubnode", "status", "create", "delete", "edit", "update", "help", "configs"}
 
 def main():
     cli_args = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -128,9 +128,13 @@ def main():
     flask_thread = threading.Thread(target=_run_flask, daemon=True)
     flask_thread.start()
 
-    logger.info("Starting Telegram bot...")
-    import bot
-    bot.start()
+    if os.getenv("BOT_ENABLED", "true").lower() != "false":
+        logger.info("Starting Telegram bot...")
+        import bot
+        bot.start()
+    else:
+        logger.info("Telegram bot disabled (BOT_ENABLED=false). Running panel only.")
+        flask_thread.join()
 
 if __name__ == "__main__":
     main()

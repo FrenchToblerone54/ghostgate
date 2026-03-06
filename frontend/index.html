@@ -459,6 +459,7 @@ Refresh
 <div class="card">
 <div class="card-header"><span class="card-title">Telegram Bot</span></div>
 <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+<div class="fg"><label class="fl">Bot Enabled</label><select class="fi" id="cfg-bot-enabled"><option value="true">Enabled</option><option value="false">Disabled</option></select></div>
 <div class="fg"><label class="fl">Bot Token</label><input class="fi" id="cfg-token" type="password" placeholder="123456:ABC-DEF..."></div>
 <div class="fg"><label class="fl">Admin User ID</label><input class="fi" id="cfg-admin" placeholder="123456789"></div>
 <div class="fg"><label class="fl">Bot Proxy (optional)</label><input class="fi" id="cfg-proxy" placeholder="http://proxy:3128"></div>
@@ -543,7 +544,16 @@ Refresh
 </div>
 <div class="modal-ft">
 <button class="btn btn-ghost" id="md-regen-btn" onclick="regenSubId()">Regen ID</button>
+<button class="btn btn-ghost" onclick="openConfigs()">Node Configs</button>
 </div>
+</div>
+</div>
+
+<div class="overlay" id="m-configs">
+<div class="modal wide">
+<div class="modal-hd"><h3>Node Configs</h3><button class="modal-x" onclick="closeM('m-configs')">&#215;</button></div>
+<div class="modal-bd" id="mc-configs-body" style="gap:8px"></div>
+<div class="modal-ft"><button class="btn btn-ghost" onclick="closeM('m-configs')">Close</button></div>
 </div>
 </div>
 
@@ -862,6 +872,15 @@ async function regenSubId(){
     document.getElementById("md-qr").src=API+"/api/subscriptions/"+r.new_id+"/qr";
   }
   btn.disabled=false; btn.textContent="Regen ID";
+}
+
+async function openConfigs(){
+  const body=document.getElementById("mc-configs-body");
+  body.innerHTML="<div style='color:var(--text2)'>Loading...</div>";
+  document.getElementById("m-configs").classList.add("open");
+  const configs=await fetch(API+"/api/subscriptions/"+detailSubId+"/configs").then(r=>r.json());
+  if(!configs.length){body.innerHTML="<div style='color:var(--text2)'>No configs available.</div>";return;}
+  body.innerHTML=configs.map(c=>`<div style='display:flex;flex-direction:column;gap:4px'><div style='font-size:0.8em;color:var(--text2);font-weight:600'>${c.node}</div><div class='detail-url'><code style='font-size:0.7em'>${c.config}</code><button onclick='navigator.clipboard.writeText(${JSON.stringify(c.config)}).then(()=>{this.textContent="Copied";setTimeout(()=>this.textContent="Copy",1500)})'>Copy</button></div></div>`).join("");
 }
 
 async function editSub(id){
@@ -1232,6 +1251,7 @@ async function loadSettings(){
   document.getElementById("cfg-profile-title").value=s.PROFILE_TITLE||"GhostGate Subscription";
   document.getElementById("cfg-threads").value=s.PANEL_THREADS||"8";
   document.getElementById("cfg-log").value=s.LOG_FILE||"";
+  document.getElementById("cfg-bot-enabled").value=(s.BOT_ENABLED||"true").toLowerCase()==="false"?"false":"true";
   document.getElementById("cfg-token").value=s.BOT_TOKEN||"";
   document.getElementById("cfg-admin").value=s.ADMIN_ID||"";
   document.getElementById("cfg-proxy").value=s.BOT_PROXY||"";
@@ -1251,6 +1271,7 @@ async function saveSettings(){
     PROFILE_TITLE:document.getElementById("cfg-profile-title").value.trim(),
     PANEL_THREADS:document.getElementById("cfg-threads").value.trim(),
     LOG_FILE:document.getElementById("cfg-log").value.trim(),
+    BOT_ENABLED:document.getElementById("cfg-bot-enabled").value,
     BOT_TOKEN:document.getElementById("cfg-token").value.trim(),
     ADMIN_ID:document.getElementById("cfg-admin").value.trim(),
     BOT_PROXY:document.getElementById("cfg-proxy").value.trim(),
