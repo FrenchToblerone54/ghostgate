@@ -163,6 +163,7 @@ Nodes already assigned to the subscription are silently skipped.
 | `POST` | `/api/bulk/delete` | Delete multiple subscriptions and remove their clients from all nodes |
 | `POST` | `/api/bulk/toggle` | Enable or disable multiple subscriptions |
 | `POST` | `/api/bulk/extend` | Add data (GB) and/or days to multiple subscriptions |
+| `POST` | `/api/bulk/data` | Multiply or divide the data limit of multiple subscriptions by a factor |
 | `POST` | `/api/bulk/note` | Set or clear the note on multiple subscriptions |
 
 **`/api/bulk/nodes` request body:**
@@ -196,6 +197,13 @@ Returns `{"ok": true}`.
 ```
 
 Both `data_gb` and `days` are optional and additive — data is added to the current limit, days are extended from the current expiry (or from now if no expiry is set). **Negative values subtract** — e.g. `"data_gb": -5` removes 5 GB (clamped to 0), `"days": -7` removes 7 days from the current expiry (skipped if no expiry set). Pass `"remove_expiry": true` to clear the expiry date (takes priority over `days`). Pass `"remove_data_limit": true` to set unlimited data (takes priority over `data_gb`). All expiry changes are pushed to 3x-ui nodes immediately. Returns `{"ok": true}`.
+
+**`/api/bulk/data` request body:**
+```json
+{ "sub_ids": ["abc123", "def456"], "factor": 2, "action": "multiply" }
+```
+
+`action` is either `"multiply"` or `"divide"`. Multiplies or divides the current `data_gb` of each subscription by `factor`. Subscriptions with unlimited data (0 GB) are skipped. Returns `{"ok": true}`.
 
 **`/api/bulk/note` request body:**
 ```json

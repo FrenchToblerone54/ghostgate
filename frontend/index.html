@@ -395,6 +395,9 @@ Refresh
 <input class="fi" id="bulk-add-gb" type="number" min="0" step="0.1" placeholder="GB" style="width:72px;padding:5px 8px;font-size:0.82em">
 <button class="btn btn-ghost btn-sm" onclick="bulkExtend('data',1)">+Data</button>
 <button class="btn btn-danger btn-sm" onclick="bulkExtend('data',-1)">-Data</button>
+<input class="fi" id="bulk-factor" type="number" min="0.01" step="0.1" placeholder="factor" style="width:72px;padding:5px 8px;font-size:0.82em">
+<button class="btn btn-ghost btn-sm" onclick="bulkDataScale('multiply')">×Data</button>
+<button class="btn btn-danger btn-sm" onclick="bulkDataScale('divide')">÷Data</button>
 <input class="fi" id="bulk-add-days" type="number" min="1" placeholder="days" style="width:66px;padding:5px 8px;font-size:0.82em">
 <button class="btn btn-ghost btn-sm" onclick="bulkExtend('days',1)">+Days</button>
 <button class="btn btn-danger btn-sm" onclick="bulkExtend('days',-1)">-Days</button>
@@ -1013,6 +1016,14 @@ async function bulkNoDataLimit(){
   if(!n) return;
   await fetch(API+"/api/bulk/extend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],remove_data_limit:true})});
   clearBulk(); loadSubs(); showAlert("s-alert","Removed data limit from "+n+" subscriptions","ok");
+}
+async function bulkDataScale(action){
+  const n=selectedSubs.size;
+  if(!n) return;
+  const factor=parseFloat(document.getElementById("bulk-factor").value)||0;
+  if(!factor||factor<=0) return;
+  await fetch(API+"/api/bulk/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],factor,action})});
+  clearBulk(); loadSubs(); showAlert("s-alert",(action==="multiply"?"Multiplied":"Divided")+" data of "+n+" subscriptions","ok");
 }
 async function bulkSetNote(){
   const n=selectedSubs.size;

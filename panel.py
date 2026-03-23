@@ -747,6 +747,22 @@ def register_routes(panel_path):
             db.update_sub(sub_id, note=note)
         return jsonify({"ok": True})
 
+    @app.route(f"/{panel_path}/api/bulk/data", methods=["POST"])
+    def api_bulk_data():
+        data = request.json
+        sub_ids = data.get("sub_ids", [])
+        factor = float(data.get("factor", 1))
+        action = data.get("action")
+        if factor <= 0 or action not in ("multiply", "divide"):
+            return jsonify({"error": "invalid input"}), 400
+        for sub_id in sub_ids:
+            sub = db.get_sub(sub_id)
+            if not sub or not sub.get("data_gb"):
+                continue
+            new_gb = sub["data_gb"] * factor if action == "multiply" else sub["data_gb"] / factor
+            db.update_sub(sub_id, data_gb=max(0, round(new_gb, 2)))
+        return jsonify({"ok": True})
+
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/regen-id", methods=["POST"])
     def api_sub_regen_id(sub_id):
         sub = db.get_sub(sub_id)
