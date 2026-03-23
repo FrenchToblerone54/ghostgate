@@ -252,6 +252,12 @@ def cmd_editnode(args):
         console.print(f"[{WARN}]No valid changes provided.[/]")
         return
     db.update_node(node_id, **updates)
+    if "enabled" in updates:
+        from panel import _disable_node_clients, _enable_node_clients
+        if updates["enabled"]:
+            _enable_node_clients(node_id)
+        else:
+            _disable_node_clients(node_id)
     updated = db.get_node(node_id)
     st = f"[{ACC}]On[/]" if updated.get("enabled") else f"[{DANGER}]Off[/]"
     console.print(f"[{ACC}]Updated node:[/] [{MUTED}][{node_id}][/] {updated['name']}  {st}")
@@ -294,6 +300,22 @@ def cmd_editsubnode(args):
         console.print(f"[{DANGER}]Sub-node not found: {ni_id}[/]")
         return
     opts = _parse_opts(args[1:])
+    if "move-up" in opts or "move-down" in opts:
+        inbounds = db.get_node_inbounds(ni["node_id"])
+        ids = [n["id"] for n in inbounds]
+        if ni_id in ids:
+            idx = ids.index(ni_id)
+            if "move-up" in opts and idx > 0:
+                ids[idx], ids[idx-1] = ids[idx-1], ids[idx]
+                db.reorder_node_inbounds(ni["node_id"], ids)
+                console.print(f"[{ACC}]Moved sub-node [{ni_id}] up.[/]")
+            elif "move-down" in opts and idx < len(ids)-1:
+                ids[idx], ids[idx+1] = ids[idx+1], ids[idx]
+                db.reorder_node_inbounds(ni["node_id"], ids)
+                console.print(f"[{ACC}]Moved sub-node [{ni_id}] down.[/]")
+            else:
+                console.print(f"[{WARN}]Already at boundary.[/]")
+        return
     updates = {}
     if "name" in opts:
         updates["name"] = opts["name"]
@@ -317,6 +339,12 @@ def cmd_editsubnode(args):
         console.print(f"[{WARN}]No valid changes provided.[/]")
         return
     db.update_node_inbound(ni_id, **updates)
+    if "enabled" in updates:
+        from panel import _disable_subnode_clients, _enable_subnode_clients
+        if updates["enabled"]:
+            _enable_subnode_clients(ni_id)
+        else:
+            _disable_subnode_clients(ni_id)
     updated = db.get_node_inbound(ni_id) or ni
     st = f"[{ACC}]On[/]" if updated.get("enabled") else f"[{DANGER}]Off[/]"
     mult = updated.get("traffic_multiplier") or 1.0
@@ -494,22 +522,59 @@ def cmd_edit(args):
     console.print(f"[{ACC}]Updated: {sub.get('comment') or sub['id']}[/]")
     cmd_stats([sub["id"]])
 
-def cmd_bulknote(args):
+def cmd_addnode(args):
+    from xui_client import XUIClient
     opts = _parse_opts(args)
-    ids = [a for a in args if not a.startswith("--")]
-    if not ids:
-        console.print(f"[{DANGER}]Usage: ghostgate bulknote <id|comment> [<id|comment> ...] [--note X][/]")
+    name = opts.get("name")
+    addr = opts.get("addr")
+    user = opts.get("user")
+    pwd = opts.get("pass")
+    inbound = int(opts.get("inbound", 1))
+    proxy = opts.get("proxy")
+    multiplier = max(1.0, float(opts.get("multiplier", 1.0)))
+    if not all([name, addr, user, pwd]):
+        console.print(f"[{DANGER}]Usage: ghostgate addnode --name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...] [--multiplier N][/]")
         return
-    note = opts.get("note") or None
-    updated = 0
-    for key in ids:
-        sub = db.get_sub(key) or db.get_sub_by_comment(key)
-        if not sub:
-            console.print(f"[{WARN}]Not found: {key}[/]")
-            continue
-        db.update_sub(sub["id"], note=note)
-        updated += 1
-    console.print(f"[{ACC}]{'Set note on' if note else 'Cleared note from'} {updated} subscription(s)[/]")
+    node_id = db.add_node(name, addr, user, pwd, proxy)
+    ni_id = db.add_node_inbound(node_id, inbound, name, multiplier)
+    mult_str = f" [{WARN}]×{multiplier:g}[/]" if multiplier != 1.0 else ""
+    console.print(f"[{ACC}]Node added:[/] [{MUTED}][{node_id}][/] {name}{mult_str}  [{BLUE}]{addr}[/]  [{MUTED}]sub-node [{ni_id}] inbound {inbound}[/]")
+
+def cmd_delnode(args):
+    if not args:
+        console.print(f"[{DANGER}]Usage: ghostgate delnode <node_id>[/]")
+        return
+    try:
+        node_id = int(args[0])
+    except ValueError:
+        console.print(f"[{DANGER}]Node ID must be a number.[/]")
+        return
+    node = db.get_node(node_id)
+    if not node:
+        console.print(f"[{DANGER}]Node not found: {node_id}[/]")
+        return
+    console.print(f"[{WARN}]Delete node [bold][{node_id}] {node['name']}[/bold]? (y/N)[/] ", end="")
+    if input().strip().lower() != "y":
+        console.print(f"[{MUTED}]Aborted.[/]")
+        return
+    db.delete_node(node_id)
+    console.print(f"[{ACC}]Deleted node:[/] [{MUTED}][{node_id}][/] {node['name']}")
+
+def cmd_bot(args):
+    opts = _parse_opts(args)
+    env_path = os.getenv("ENV_PATH") or ("/opt/ghostgate/.env" if os.path.exists("/opt/ghostgate/.env") else ".env")
+    if "enable" in opts:
+        from dotenv import set_key
+        set_key(env_path, "BOT_ENABLED", "true")
+        console.print(f"[{ACC}]Bot enabled.[/] [{MUTED}]Restart service to apply: systemctl restart ghostgate[/]")
+    elif "disable" in opts:
+        from dotenv import set_key
+        set_key(env_path, "BOT_ENABLED", "false")
+        console.print(f"[{ACC}]Bot disabled.[/] [{MUTED}]Restart service to apply: systemctl restart ghostgate[/]")
+    else:
+        enabled = os.getenv("BOT_ENABLED", "true").lower() != "false"
+        st = f"[{ACC}]enabled[/]" if enabled else f"[{DANGER}]disabled[/]"
+        console.print(f"[bold white]Telegram Bot:[/] {st}  [{MUTED}]Use --enable or --disable[/]")
 
 def cmd_regen(args):
     from xui_client import XUIClient
@@ -562,15 +627,17 @@ def cmd_help(args):
         f"  [{ACC}]stats[/] [{MUTED}]<id|comment>[/]                         Show detailed subscription info",
         f"  [{ACC}]create[/] [{MUTED}][--id X] --comment X [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none][/]",
         f"  [{ACC}]edit[/] [{MUTED}]<id|comment> [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--note X] [--ip N] [--enable] [--disable][/]",
-        f"  [{ACC}]bulknote[/] [{MUTED}]<id|comment> [...] [--note X][/]          Set or clear note on multiple subscriptions",
         f"  [{ACC}]regen[/] [{MUTED}]<id|comment>[/]                         Regenerate subscription nanoid",
         f"  [{ACC}]delete[/] [{MUTED}]<id|comment>[/]                         Delete subscription",
         f"  [{ACC}]nodes[/]                                       List nodes",
-        f"  [{ACC}]editnode[/] [{MUTED}]<id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable|--disable][/]",
+        f"  [{ACC}]addnode[/] [{MUTED}]--name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...] [--multiplier N][/]",
+        f"  [{ACC}]editnode[/] [{MUTED}]<id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable|--disable][/]  (enable/disable removes/recreates clients)",
+        f"  [{ACC}]delnode[/] [{MUTED}]<id>[/]                                Delete node",
         f"  [{ACC}]subnodes[/] [{MUTED}][node_id][/]                          List sub-nodes",
         f"  [{ACC}]addsubnode[/] [{MUTED}]--node N --inbound N [--name X] [--multiplier N][/]",
-        f"  [{ACC}]editsubnode[/] [{MUTED}]<id> [--name X] [--inbound N] [--multiplier N] [--enable|--disable][/]",
+        f"  [{ACC}]editsubnode[/] [{MUTED}]<id> [--name X] [--inbound N] [--multiplier N] [--enable|--disable] [--move-up] [--move-down][/]  (enable/disable removes/recreates clients)",
         f"  [{ACC}]delsubnode[/] [{MUTED}]<id>[/]                              Delete sub-node",
+        f"  [{ACC}]bot[/] [{MUTED}][--enable|--disable][/]                    Show or toggle Telegram bot",
         f"  [{ACC}]configs[/] [{MUTED}]<id or comment>[/]                       Show per-node config URLs for a subscription",
         f"  [{ACC}]status[/]                                      System overview",
         f"  [{ACC}]update[/]                                      Check and apply update",
@@ -601,19 +668,21 @@ _COMMANDS = {
     "list": cmd_list,
     "stats": cmd_stats,
     "nodes": cmd_nodes,
+    "addnode": cmd_addnode,
     "editnode": cmd_editnode,
+    "delnode": cmd_delnode,
     "subnodes": cmd_subnodes,
     "listsubnode": cmd_subnodes,
     "status": cmd_status,
     "create": cmd_create,
     "delete": cmd_delete,
     "edit": cmd_edit,
-    "bulknote": cmd_bulknote,
     "regen": cmd_regen,
     "configs": cmd_configs,
     "addsubnode": cmd_addsubnode,
     "editsubnode": cmd_editsubnode,
     "delsubnode": cmd_delsubnode,
+    "bot": cmd_bot,
     "update": cmd_update,
     "help": cmd_help,
 }

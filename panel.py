@@ -37,8 +37,8 @@ def _sys_info():
         "load_1": round(load[0], 2), "load_5": round(load[1], 2), "load_15": round(load[2], 2)
     }
 
-def _fmt_vless(client_uuid, label, server, port, stream_settings, security):
-    params = {"type": stream_settings.get("network", "tcp"), "security": security}
+def _fmt_vless(client_uuid, label, server, port, stream_settings, security, flow="", encryption="none"):
+    params = {"type": stream_settings.get("network", "tcp"), "security": security, "encryption": encryption}
     network = stream_settings.get("network", "tcp")
     tcp_s = stream_settings.get("tcpSettings", {})
     ws_s = stream_settings.get("wsSettings", {})
@@ -60,12 +60,16 @@ def _fmt_vless(client_uuid, label, server, port, stream_settings, security):
             params["host"] = hosts[0]
     elif network == "ws":
         params["path"] = ws_s.get("path", "/")
-        host = ws_s.get("headers", {}).get("Host", "")
+        host = ws_s.get("host", "") or ws_s.get("headers", {}).get("Host", "")
         if host:
             params["host"] = host
     elif network == "grpc":
         params["serviceName"] = grpc_s.get("serviceName", "")
-        params["mode"] = "multi"
+        if grpc_s.get("multiMode"):
+            params["mode"] = "multi"
+        authority = grpc_s.get("authority", "")
+        if authority:
+            params["authority"] = authority
     elif network == "kcp":
         params["headerType"] = kcp_s.get("header", {}).get("type", "none")
         seed = kcp_s.get("seed", "")
@@ -74,13 +78,13 @@ def _fmt_vless(client_uuid, label, server, port, stream_settings, security):
     elif network in ("httpupgrade", "xhttp"):
         s = hu_s if network == "httpupgrade" else xhttp_s
         params["path"] = s.get("path", "/")
-        host = s.get("host", "")
+        host = s.get("host", "") or next((v for k, v in (s.get("headers") or {}).items() if k.lower() == "host"), "")
         if host:
             params["host"] = host
         if network == "xhttp":
             params["mode"] = s.get("mode", "auto")
     if security == "tls":
-        fp = tls_s.get("fingerprint", "")
+        fp = tls_s.get("settings", {}).get("fingerprint", "") or tls_s.get("fingerprint", "")
         if fp:
             params["fp"] = fp
         alpn = tls_s.get("alpn", [])
@@ -91,9 +95,11 @@ def _fmt_vless(client_uuid, label, server, port, stream_settings, security):
             params["sni"] = sni
         if tls_s.get("allowInsecure") or tls_s.get("settings", {}).get("allowInsecure"):
             params["allowInsecure"] = "1"
+        if flow and network == "tcp":
+            params["flow"] = flow
     elif security == "reality":
-        params["pbk"] = reality_s.get("publicKey", "")
-        fp = reality_s.get("fingerprint", "")
+        params["pbk"] = reality_s.get("settings", {}).get("publicKey", "") or reality_s.get("publicKey", "")
+        fp = reality_s.get("settings", {}).get("fingerprint", "") or reality_s.get("fingerprint", "")
         if fp:
             params["fp"] = fp
         sni = (reality_s.get("serverNames") or [""])[0]
@@ -105,6 +111,11 @@ def _fmt_vless(client_uuid, label, server, port, stream_settings, security):
         spx = reality_s.get("spiderX", "")
         if spx:
             params["spx"] = quote(spx)
+        pqv = reality_s.get("settings", {}).get("mldsa65Verify", "")
+        if pqv:
+            params["pqv"] = pqv
+        if flow and network == "tcp":
+            params["flow"] = flow
     query = "&".join(f"{k}={quote(str(v))}" for k, v in params.items())
     return f"vless://{client_uuid}@{server}:{port}?{query}#{quote(label)}"
 
@@ -116,13 +127,17 @@ def _fmt_vmess(client_uuid, label, server, port, stream_settings, security):
     hu_s = stream_settings.get("httpupgradeSettings", {})
     xhttp_s = stream_settings.get("xhttpSettings", {})
     tls_s = stream_settings.get("tlsSettings", {})
-    obj = {"v": "2", "ps": label, "add": server, "port": port, "id": client_uuid, "aid": 0, "scy": "auto", "net": net, "type": "none", "host": "", "path": "", "tls": "tls" if security == "tls" else "none", "sni": tls_s.get("serverName", ""), "alpn": ",".join(tls_s.get("alpn", [])), "fp": tls_s.get("fingerprint", "")}
+    obj = {"v": "2", "ps": label, "add": server, "port": port, "id": client_uuid, "aid": 0, "scy": "auto", "net": net, "type": "none", "host": "", "path": "", "tls": "tls" if security == "tls" else "none", "sni": tls_s.get("serverName", ""), "alpn": ",".join(tls_s.get("alpn", [])), "fp": tls_s.get("settings", {}).get("fingerprint", "") or tls_s.get("fingerprint", "")}
     if net == "ws":
         obj["path"] = ws_s.get("path", "/")
-        obj["host"] = ws_s.get("headers", {}).get("Host", "")
+        obj["host"] = ws_s.get("host", "") or ws_s.get("headers", {}).get("Host", "")
     elif net == "grpc":
         obj["path"] = grpc_s.get("serviceName", "")
-        obj["type"] = "gun"
+        authority = grpc_s.get("authority", "")
+        if grpc_s.get("multiMode"):
+            obj["type"] = "multi"
+        if authority:
+            obj["authority"] = authority
     elif net == "tcp":
         htype = tcp_s.get("header", {}).get("type", "none")
         obj["type"] = htype
@@ -132,7 +147,7 @@ def _fmt_vmess(client_uuid, label, server, port, stream_settings, security):
     elif net in ("httpupgrade", "xhttp"):
         s = hu_s if net == "httpupgrade" else xhttp_s
         obj["path"] = s.get("path", "/")
-        obj["host"] = s.get("host", "")
+        obj["host"] = s.get("host", "") or next((v for k, v in (s.get("headers") or {}).items() if k.lower() == "host"), "")
     return "vmess://" + base64.b64encode(json.dumps(obj, separators=(",", ":")).encode()).decode()
 
 def _build_sub_configs(sub_id):
@@ -150,6 +165,9 @@ def _build_sub_configs(sub_id):
             orig_port = inbound.get("port", 443)
             raw_addr = sn["address"].split("//")[-1].split("/")[0]
             orig_server = raw_addr.split(":")[0]
+            client = xui.get_client_by_email(sn["inbound_id"], sn["email"])
+            flow = (client.get("flow") or "") if client else ""
+            encryption = json.loads(inbound.get("settings", "{}")).get("decryption", "none")
             _fmt = _fmt_vmess if proto == "vmess" else _fmt_vless
             ext_proxies = stream.get("externalProxy") or []
             if ext_proxies:
@@ -161,10 +179,12 @@ def _build_sub_configs(sub_id):
                     ep_stream = dict(stream)
                     ep_stream["security"] = ep_security
                     label = f"{sn.get('inbound_name') or sn['name']}-{i+1}" if i > 0 else (sn.get("inbound_name") or sn["name"])
-                    result.append({"node": label, "config": _fmt(sn["client_uuid"], label, ep_server, ep_port, ep_stream, ep_security)})
+                    cfg = _fmt(sn["client_uuid"], label, ep_server, ep_port, ep_stream, ep_security, flow=flow, encryption=encryption) if proto == "vless" else _fmt(sn["client_uuid"], label, ep_server, ep_port, ep_stream, ep_security)
+                    result.append({"node": label, "config": cfg})
             else:
                 label = sn.get("inbound_name") or sn["name"]
-                result.append({"node": label, "config": _fmt(sn["client_uuid"], label, orig_server, orig_port, stream, orig_security)})
+                cfg = _fmt(sn["client_uuid"], label, orig_server, orig_port, stream, orig_security, flow=flow, encryption=encryption) if proto == "vless" else _fmt(sn["client_uuid"], label, orig_server, orig_port, stream, orig_security)
+                result.append({"node": label, "config": cfg})
         except Exception:
             pass
     return result
@@ -221,13 +241,16 @@ def sub_page(sub_id):
         sub_enabled = bool(sub.get("enabled", 1))
         expire_exact = f"Exact expiry: {sub['expire_at']}" if sub.get("expire_at") else (f"Expiry starts after first use ({int(sub.get('expire_after_first_use_seconds',0))//86400} days)" if int(sub.get("expire_after_first_use_seconds",0))>0 else "No expiry set")
         data_tip = f"Used: {total_bytes:,} bytes ({total_bytes/1073741824:.4f} GB)\nLimit: {limit_bytes:,} bytes ({sub['data_gb']} GB)\n{data_percent}% consumed" if limit_bytes>0 else f"Used: {total_bytes:,} bytes ({total_bytes/1073741824:.4f} GB)\nLimit: Unlimited"
+        raw_configs = _build_sub_configs(sub_id)
+        configs_with_qr = [{"node": c["node"], "config": c["config"], "qr_b64": _make_qr_b64(c["config"])} for c in raw_configs]
         return render_template_string(tmpl,
             sub_url=sub_url, qr_b64=qr_b64,
             data_used_str=data_used_str, data_total_str=data_total_str, data_percent=data_percent,
             expire_str=expire_str, is_expired=is_expired, is_over_limit=is_over_limit,
             sub_enabled=sub_enabled,
             data_label=data_label, expire_label=expire_label,
-            expire_exact=expire_exact, data_tip=data_tip
+            expire_exact=expire_exact, data_tip=data_tip,
+            configs=configs_with_qr
         )
     configs = [
         f"vless://00000000-0000-0000-0000-000000000001@0.0.0.0:443?type=tcp#{quote(f'{data_label}: {total_bytes*sm/1073741824:.2f} GB / {data_total_str}')}",
@@ -246,6 +269,67 @@ def sub_page(sub_id):
         "profile-web-page-url": sub_url
     }
     return "\n".join(configs), 200, headers
+
+def _disable_subnode_clients(ni_id):
+    ni = db.get_node_inbound_with_node(ni_id)
+    if not ni:
+        return
+    for sn in db.get_sub_nodes_for_inbound(ni_id):
+        try:
+            xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+            xui.delete_client(ni["inbound_id"], sn["client_uuid"])
+        except Exception:
+            pass
+
+def _enable_subnode_clients(ni_id):
+    ni = db.get_node_inbound_with_node(ni_id)
+    if not ni:
+        return
+    for sn in db.get_sub_nodes_for_inbound(ni_id):
+        try:
+            sub = db.get_sub(sn["sub_id"])
+            if not sub:
+                continue
+            xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+            data_gb = sub.get("data_gb") or 0
+            used_bytes = sub.get("used_bytes") or 0
+            mult = ni.get("traffic_multiplier") or 1.0
+            remaining = max(0, data_gb * 1073741824 - used_bytes)
+            total_limit = int(remaining / mult) if data_gb > 0 else 0
+            expire_ms = 0
+            if sub.get("expire_at"):
+                try:
+                    expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
+                except Exception:
+                    pass
+            expire_after = int(sub.get("expire_after_first_use_seconds") or 0)
+            expiry_time = -expire_after*1000 if expire_after>0 and not sub.get("expire_at") else expire_ms
+            now = datetime.now(timezone.utc)
+            is_disabled = sub.get("enabled") == 0
+            is_expired = bool(sub.get("expire_at")) and datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc) < now
+            is_over_limit = data_gb > 0 and used_bytes >= data_gb * 1073741824
+            client = xui.make_client(sn["email"], sn["client_uuid"], expiry_time, sub.get("ip_limit", 0), sub["id"], sub.get("comment") or "", total_limit)
+            if is_disabled or is_expired or is_over_limit:
+                client["enable"] = False
+            xui.add_client(ni["inbound_id"], client)
+            db.set_sub_node_disabled(sn["sub_id"], sn["node_id"], bool(is_disabled or is_expired or is_over_limit))
+        except Exception:
+            pass
+
+def _disable_node_clients(node_id):
+    node = db.get_node(node_id)
+    if not node:
+        return
+    for ni in db.get_node_inbounds(node_id):
+        _disable_subnode_clients(ni["id"])
+
+def _enable_node_clients(node_id):
+    node = db.get_node(node_id)
+    if not node:
+        return
+    for ni in db.get_node_inbounds(node_id):
+        if ni.get("enabled"):
+            _enable_subnode_clients(ni["id"])
 
 def register_routes(panel_path):
     global BASE_URL
@@ -726,7 +810,15 @@ def register_routes(panel_path):
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>", methods=["PUT"])
     def api_node_update(node_id):
         data = request.json
+        old_node = db.get_node(node_id)
+        old_enabled = old_node.get("enabled", 1) if old_node else 1
         db.update_node(node_id, **data)
+        if "enabled" in data:
+            new_enabled = int(data["enabled"])
+            if old_enabled and not new_enabled:
+                _disable_node_clients(node_id)
+            elif not old_enabled and new_enabled:
+                _enable_node_clients(node_id)
         return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>", methods=["DELETE"])
@@ -753,7 +845,33 @@ def register_routes(panel_path):
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds/<int:ni_id>", methods=["PUT"])
     def api_node_inbound_update(node_id, ni_id):
         data = request.json
+        old_ni = db.get_node_inbound(ni_id)
+        old_enabled = old_ni.get("enabled", 1) if old_ni else 1
+        old_mult = float(old_ni.get("traffic_multiplier") or 1.0) if old_ni else 1.0
         db.update_node_inbound(ni_id, **data)
+        if "enabled" in data:
+            new_enabled = int(data["enabled"])
+            if old_enabled and not new_enabled:
+                _disable_subnode_clients(ni_id)
+            elif not old_enabled and new_enabled:
+                _enable_subnode_clients(ni_id)
+        if "traffic_multiplier" in data:
+            new_mult = float(data["traffic_multiplier"])
+            if abs(new_mult - old_mult) > 0.001:
+                ni = db.get_node_inbound_with_node(ni_id)
+                if ni:
+                    for sn in db.get_sub_nodes_for_inbound(ni_id):
+                        try:
+                            xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+                            t = xui.get_client_traffic(sn["email"])
+                            raw = ((t.get("up") or 0) + (t.get("down") or 0)) if t else 0
+                            old_offset = sn.get("traffic_offset") or 0.0
+                            old_baseline = sn.get("traffic_baseline") or 0
+                            adjusted_raw = max(0, raw - old_baseline)
+                            new_offset = old_offset + adjusted_raw * old_mult
+                            db.set_sub_node_traffic_offset(sn["sub_id"], sn["node_id"], new_offset, raw)
+                        except Exception:
+                            pass
         return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds/<int:ni_id>", methods=["DELETE"])

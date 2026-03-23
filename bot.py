@@ -63,17 +63,16 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/delete <id or comment>\n"
         "/stats <id or comment>\n"
         "/edit <id or comment> [--comment X] [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]\n"
-        "/bulknote <id or comment> [...] [--note X]\n"
         "/regen <id or comment>\n"
         "/configs <id or comment>\n"
         "/list [page] — 10 per page\n"
         "/nodes\n"
         "/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...] [--multiplier N]\n"
-        "/editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]\n"
+        "/editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable] (enable/disable removes/recreates clients)\n"
         "/delnode <id>\n"
         "/subnodes [node_id]\n"
         "/addsubnode --node N --inbound N [--name X] [--multiplier N]\n"
-        "/editsubnode <id> [--name X] [--inbound N] [--multiplier N] [--enable|--disable]\n"
+        "/editsubnode <id> [--name X] [--inbound N] [--multiplier N] [--enable|--disable] [--move-up] [--move-down] (enable/disable removes/recreates clients)\n"
         "/delsubnode <id>\n"
     )
 
@@ -349,6 +348,12 @@ async def cmd_editnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("No valid changes provided.")
         return
     db.update_node(node_id, **updates)
+    if "enabled" in updates:
+        from panel import _disable_node_clients, _enable_node_clients
+        if updates["enabled"]:
+            _enable_node_clients(node_id)
+        else:
+            _disable_node_clients(node_id)
     updated = db.get_node(node_id)
     st = "on" if updated and updated.get("enabled") else "off"
     await update.message.reply_text(f"Updated node: [{node_id}] {updated['name']} ({st})")
@@ -421,6 +426,22 @@ async def cmd_editsubnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Sub-node not found.")
         return
     opts=_parse_opts(all_args[1:])
+    if "move-up" in opts or "move-down" in opts:
+        inbounds = db.get_node_inbounds(ni.get("node_id"))
+        ids = [n["id"] for n in inbounds]
+        if ni_id in ids:
+            idx = ids.index(ni_id)
+            if "move-up" in opts and idx > 0:
+                ids[idx], ids[idx-1] = ids[idx-1], ids[idx]
+                db.reorder_node_inbounds(ni.get("node_id"), ids)
+                await update.message.reply_text(f"Moved sub-node [{ni_id}] up.")
+            elif "move-down" in opts and idx < len(ids)-1:
+                ids[idx], ids[idx+1] = ids[idx+1], ids[idx]
+                db.reorder_node_inbounds(ni.get("node_id"), ids)
+                await update.message.reply_text(f"Moved sub-node [{ni_id}] down.")
+            else:
+                await update.message.reply_text("Already at boundary.")
+        return
     updates={}
     if "name" in opts:
         updates["name"]=opts["name"]
@@ -444,6 +465,12 @@ async def cmd_editsubnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("No valid changes provided.")
         return
     db.update_node_inbound(ni_id,**updates)
+    if "enabled" in updates:
+        from panel import _disable_subnode_clients, _enable_subnode_clients
+        if updates["enabled"]:
+            _enable_subnode_clients(ni_id)
+        else:
+            _disable_subnode_clients(ni_id)
     updated=db.get_node_inbound_with_node(ni_id)
     st="on" if updated and updated.get("inbound_enabled") else "off"
     mult=(updated.get("traffic_multiplier") if updated else ni.get("traffic_multiplier",1.0)) or 1.0
@@ -498,35 +525,6 @@ async def cmd_subnodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("No sub-nodes configured.")
         return
     await update.message.reply_text("\n".join(lines))
-
-async def cmd_bulknote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    if not _is_admin(update.effective_user.id):
-        return
-    if not ctx.args:
-        await update.message.reply_text("Usage: /bulknote <id or comment> [<id or comment> ...] [--note X]\nOmit --note to clear.")
-        return
-    all_args = list(ctx.args)
-    opts = _parse_opts(all_args)
-    note = opts.get("note") or None
-    ids = []
-    i = 0
-    while i < len(all_args):
-        if all_args[i].startswith("--"):
-            i += 2 if i+1 < len(all_args) and not all_args[i+1].startswith("--") else 1
-        else:
-            ids.append(all_args[i])
-            i += 1
-    if not ids:
-        await update.message.reply_text("No subscription IDs provided.")
-        return
-    updated = 0
-    for key in ids:
-        sub = db.get_sub(key) or db.get_sub_by_comment(key)
-        if not sub:
-            continue
-        db.update_sub(sub["id"], note=note)
-        updated += 1
-    await update.message.reply_text(("Set note on" if note else "Cleared note from") + f" {updated} subscription(s).")
 
 async def cmd_regen(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update.effective_user.id):
@@ -603,7 +601,6 @@ async def _post_init(app):
         ("stats", "Subscription stats"),
         ("list", "List subscriptions (10/page)"),
         ("edit", "Edit subscription"),
-        ("bulknote", "Set/clear note on multiple subscriptions"),
         ("regen", "Regenerate subscription nanoid"),
         ("configs", "Show per-node config URLs for a subscription"),
         ("nodes", "List nodes"),
@@ -635,7 +632,6 @@ def _build_app():
     application.add_handler(CommandHandler("stats", cmd_stats))
     application.add_handler(CommandHandler("list", cmd_list))
     application.add_handler(CommandHandler("edit", cmd_edit))
-    application.add_handler(CommandHandler("bulknote", cmd_bulknote))
     application.add_handler(CommandHandler("regen", cmd_regen))
     application.add_handler(CommandHandler("configs", cmd_configs))
     application.add_handler(CommandHandler("nodes", cmd_nodes))

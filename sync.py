@@ -29,7 +29,10 @@ def _sync_once():
                 if t:
                     raw = (t.get("up") or 0) + (t.get("down") or 0)
                     node_bytes[sn["node_id"]] = raw
-                    total_effective += raw * (sn.get("traffic_multiplier") or 1.0)
+                    offset = sn.get("traffic_offset") or 0.0
+                    baseline = sn.get("traffic_baseline") or 0
+                    adjusted_raw = max(0, raw - baseline)
+                    total_effective += offset + adjusted_raw * (sn.get("traffic_multiplier") or 1.0)
             except Exception as e:
                 logger.warning(f"sync error node {sn['node_id']} sub {sid}: {e}")
         total_effective = int(total_effective)

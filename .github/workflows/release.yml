@@ -9,7 +9,7 @@ on:
 permissions:
   contents: write
 jobs:
-  release:
+  build-amd64:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -39,13 +39,73 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pyinstaller
       - name: Build
+        run: bash build/build.sh
+      - name: Upload amd64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghostgate-amd64
+          path: |
+            dist/ghostgate
+            dist/ghostgate.sha256
+  build-arm64:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Ensure python3.13 alias
         run: |
-          bash build/build.sh
+          if ! command -v python3.13 >/dev/null 2>&1; then
+            sudo ln -sf "$(which python)" /usr/local/bin/python3.13
+          fi
+      - name: Normalize version input
+        id: ver
+        run: |
+          ver="${{ inputs.version }}"
+          ver="${ver#v}"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+      - name: Build
+        run: |
+          python3.13 -m PyInstaller --onefile --name ghostgate-arm64 --add-data "frontend:frontend" --collect-all rich main.py
+          cd dist && sha256sum ghostgate-arm64 > ghostgate-arm64.sha256
+      - name: Upload arm64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghostgate-arm64
+          path: |
+            dist/ghostgate-arm64
+            dist/ghostgate-arm64.sha256
+  release:
+    needs: [build-amd64, build-arm64]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Normalize version input
+        id: ver
+        run: |
+          ver="${{ inputs.version }}"
+          ver="${ver#v}"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+      - name: Download amd64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ghostgate-amd64
+          path: dist/
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ghostgate-arm64
+          path: dist/
       - name: Create release
         uses: ncipollo/release-action@v1
         with:
           tag: v${{ steps.ver.outputs.version }}
           name: v${{ steps.ver.outputs.version }}
-          artifacts: dist/ghostgate,dist/ghostgate.sha256
+          artifacts: dist/ghostgate,dist/ghostgate.sha256,dist/ghostgate-arm64,dist/ghostgate-arm64.sha256
           allowUpdates: true
           generateReleaseNotes: true

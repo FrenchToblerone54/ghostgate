@@ -18,7 +18,7 @@
 
 - **پشتیبانی از پروکسی خارجی** - تنظیمات external proxy در 3x-ui را برای CDN رعایت می‌کند
 
-- **فایل باینری کامپایل شده** - Linux amd64 (سازگار با Ubuntu 22.04+)، نیازی به Python در سرور نیست
+- **فایل باینری کامپایل شده** - Linux amd64 و arm64 (سازگار با Ubuntu 22.04+)، نیازی به Python در سرور نیست
 
 - **سرویس systemd** - شروع خودکار، راه‌اندازی مجدد، لاگ‌نویسی
 
@@ -41,15 +41,24 @@ sudo ./install.sh
 ## دستورات ربات
 
 ```
-/create [--comment نام] [--data گیگابایت] [--days روز] [--ip تعداد] [--nodes 1,2|all|none]
+/create [--comment نام] [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none]
 /delete <آیدی یا کامنت>
 /stats <آیدی یا کامنت>
 /list [صفحه]
-/edit <آیدی یا کامنت> [--comment X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
+/edit <آیدی یا کامنت> [--comment X] [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
 /regen <آیدی یا کامنت>
+/configs <آیدی یا کامنت>
 /nodes
+/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...] [--multiplier N]
 /editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]
+/delnode <id>
+/subnodes [node_id]
+/addsubnode --node N --inbound N [--name X] [--multiplier N]
+/editsubnode <id> [--name X] [--inbound N] [--multiplier N] [--enable] [--disable] [--move-up] [--move-down]
+/delsubnode <id>
 ```
+
+فعال/غیرفعال کردن نود یا ساب‌نود باعث حذف یا بازسازی کلاینت‌های آن در 3x-ui می‌شود. صفحه اشتراک در مرورگر، کانفیگ‌های منفرد هر نود را با QR کد نمایش می‌دهد.
 
 ## تنظیمات
 
@@ -269,7 +278,15 @@ sudo journalctl -u ghostgate -f
 | `ghostgate regen <آیدی\|کامنت>` | بازسازی nanoid اشتراک (لینک قدیمی از کار می‌افتد) |
 | `ghostgate delete <آیدی\|کامنت>` | حذف اشتراک و حذف کلاینت‌های آن از تمام نودها |
 | `ghostgate nodes` | لیست تمام نودهای تنظیم‌شده |
-| `ghostgate editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]` | ویرایش یا فعال/غیرفعال کردن نود |
+| `ghostgate addnode --name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...] [--multiplier N]` | افزودن نود |
+| `ghostgate editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]` | ویرایش یا فعال/غیرفعال کردن نود (فعال/غیرفعال‌سازی کلاینت‌ها را حذف/بازسازی می‌کند) |
+| `ghostgate delnode <id>` | حذف نود |
+| `ghostgate subnodes [node_id]` | لیست ساب‌نودها |
+| `ghostgate addsubnode --node N --inbound N [--name X] [--multiplier N]` | افزودن ساب‌نود |
+| `ghostgate editsubnode <id> [--name X] [--inbound N] [--multiplier N] [--enable] [--disable] [--move-up] [--move-down]` | ویرایش ساب‌نود؛ تغییر multiplier مصرف قبلی را با نرخ قدیم نگه می‌دارد |
+| `ghostgate delsubnode <id>` | حذف ساب‌نود |
+| `ghostgate configs <آیدی\|کامنت>` | نمایش کانفیگ‌های هر نود برای یک اشتراک |
+| `ghostgate bot [--enable\|--disable]` | نمایش یا تغییر وضعیت ربات تلگرام |
 | `ghostgate update` | بررسی به‌روزرسانی و اعمال آن در صورت وجود |
 
 **مثال‌ها:**

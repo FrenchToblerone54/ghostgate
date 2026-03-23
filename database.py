@@ -18,7 +18,7 @@ def _conn():
     finally:
         c.close()
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 def init_db():
     with _conn() as c:
@@ -116,6 +116,8 @@ CREATE TABLE IF NOT EXISTS subscription_nodes (
     node_id INTEGER NOT NULL,
     client_uuid TEXT NOT NULL,
     email TEXT NOT NULL,
+    traffic_offset REAL DEFAULT 0,
+    traffic_baseline INTEGER DEFAULT 0,
     PRIMARY KEY (sub_id, node_id),
     FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
     FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
@@ -203,6 +205,12 @@ FROM nodes n""")
             if not _col_exists("subscriptions", "note"):
                 c.execute("ALTER TABLE subscriptions ADD COLUMN note TEXT")
             c.execute("PRAGMA user_version=6")
+        if user_ver < 7:
+            if not _col_exists("subscription_nodes", "traffic_offset"):
+                c.execute("ALTER TABLE subscription_nodes ADD COLUMN traffic_offset REAL DEFAULT 0")
+            if not _col_exists("subscription_nodes", "traffic_baseline"):
+                c.execute("ALTER TABLE subscription_nodes ADD COLUMN traffic_baseline INTEGER DEFAULT 0")
+            c.execute("PRAGMA user_version=7")
 
 def add_node(name, address, username, password, proxy_url=None):
     with _conn() as c:
@@ -367,6 +375,7 @@ def get_sub_nodes(sub_id):
     with _conn() as c:
         return [dict(r) for r in c.execute(
             "SELECT sn.sub_id, sn.node_id, sn.client_uuid, sn.email, sn.client_disabled, "
+            "sn.traffic_offset, sn.traffic_baseline, "
             "ni.inbound_id, ni.name AS inbound_name, ni.traffic_multiplier, "
             "n.name, n.address, n.username, n.password, n.proxy_url, n.enabled "
             "FROM subscription_nodes sn "
@@ -379,6 +388,7 @@ def get_all_sub_nodes():
     with _conn() as c:
         return [dict(r) for r in c.execute(
             "SELECT sn.sub_id, sn.node_id, sn.client_uuid, sn.email, sn.client_disabled, "
+            "sn.traffic_offset, sn.traffic_baseline, "
             "ni.inbound_id, ni.name AS inbound_name, ni.traffic_multiplier, "
             "n.name, n.address, n.username, n.password, n.proxy_url, n.enabled "
             "FROM subscription_nodes sn "
@@ -398,6 +408,24 @@ def set_sub_node_disabled(sub_id, node_id, disabled):
 def reset_sub_node_disabled(sub_id):
     with _conn() as c:
         c.execute("UPDATE subscription_nodes SET client_disabled=0 WHERE sub_id=?", (sub_id,))
+
+def get_sub_nodes_for_inbound(ni_id):
+    with _conn() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT sn.sub_id, sn.node_id, sn.client_uuid, sn.email, sn.client_disabled, "
+            "sn.traffic_offset, sn.traffic_baseline, "
+            "ni.inbound_id, ni.name AS inbound_name, ni.traffic_multiplier, "
+            "n.name, n.address, n.username, n.password, n.proxy_url, n.enabled "
+            "FROM subscription_nodes sn "
+            "JOIN node_inbounds ni ON sn.node_id=ni.id "
+            "JOIN nodes n ON ni.node_id=n.id "
+            "WHERE sn.node_id=?",
+            (ni_id,)
+        )]
+
+def set_sub_node_traffic_offset(sub_id, node_id, offset, baseline):
+    with _conn() as c:
+        c.execute("UPDATE subscription_nodes SET traffic_offset=?, traffic_baseline=? WHERE sub_id=? AND node_id=?", (float(offset), int(baseline), sub_id, node_id))
 
 def reorder_sub_nodes(sub_id, node_ids):
     with _conn() as c:

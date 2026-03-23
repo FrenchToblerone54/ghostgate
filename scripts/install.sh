@@ -13,8 +13,12 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 ARCH=$(uname -m)
-if [ "$ARCH" != "x86_64" ]; then
-    echo "Error: Only x86_64 (amd64) architecture is supported"
+if [ "$ARCH" = "x86_64" ]; then
+    BIN_NAME="ghostgate"
+elif [ "$ARCH" = "aarch64" ]; then
+    BIN_NAME="ghostgate-arm64"
+else
+    echo "Error: Unsupported architecture: $ARCH. Only x86_64 and aarch64 (ARM64) are supported."
     exit 1
 fi
 
@@ -25,8 +29,8 @@ if [ "$OS" != "Linux" ]; then
 fi
 
 echo "Downloading GhostGate..."
-wget -q --show-progress "https://github.com/${GITHUB_REPO}/releases/${VERSION}/download/ghostgate" -O /tmp/ghostgate
-wget -q "https://github.com/${GITHUB_REPO}/releases/${VERSION}/download/ghostgate.sha256" -O /tmp/ghostgate.sha256
+wget -q --show-progress "https://github.com/${GITHUB_REPO}/releases/${VERSION}/download/${BIN_NAME}" -O /tmp/ghostgate
+wget -q "https://github.com/${GITHUB_REPO}/releases/${VERSION}/download/${BIN_NAME}.sha256" -O /tmp/ghostgate.sha256
 
 echo "Verifying checksum..."
 cd /tmp

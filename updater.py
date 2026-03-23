@@ -5,11 +5,14 @@ import hashlib
 import shutil
 import threading
 import logging
+import platform
 import requests
 
-VERSION = "0.8.0"
+VERSION = "0.9.0"
 GITHUB_REPO = "frenchtoblerone54/ghostgate"
 _logger = logging.getLogger("updater")
+_arch = platform.machine()
+_bin_suffix = "-arm64" if _arch == "aarch64" else ""
 
 def _ver_gt(a, b):
     return tuple(int(x) for x in a.lstrip("v").split(".")) > tuple(int(x) for x in b.lstrip("v").split("."))
@@ -53,8 +56,8 @@ def apply_update():
         if not latest or not _ver_gt(latest, VERSION):
             return False
         assets = {a["name"]: a["browser_download_url"] for a in data.get("assets", [])}
-        bin_url = assets.get("ghostgate")
-        sha_url = assets.get("ghostgate.sha256")
+        bin_url = assets.get(f"ghostgate{_bin_suffix}") or assets.get("ghostgate")
+        sha_url = assets.get(f"ghostgate{_bin_suffix}.sha256") or assets.get("ghostgate.sha256")
         if not bin_url or not sha_url:
             _logger.warning("Release assets not found (ghostgate / ghostgate.sha256)")
             return False

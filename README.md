@@ -12,7 +12,7 @@ GhostGate is a sales and subscription management panel for [3x-ui](https://githu
 - **Auto sync** - Background worker syncs traffic usage and enforces data/expiry limits
 - **Subscription links** - Standard VLESS and VMess subscription URLs with QR codes
 - **External proxy support** - Respects 3x-ui external proxy configurations for CDN setups
-- **Compiled binary** - Linux amd64 (Ubuntu 22.04+ compatible), no Python required on server
+- **Compiled binary** - Linux amd64 and arm64 (Ubuntu 22.04+ compatible), no Python required on server
 - **systemd service** - Automated start, restart, logging
 - **Auto-update** - Automatic binary updates via GitHub releases; manual update via `ghostgate update` or the Settings page
 - **Bulk operations** - Bulk delete, enable, or disable multiple subscriptions at once from the web panel
@@ -31,15 +31,24 @@ Save the panel URL shown at the end — it is your admin panel access path.
 ## Bot Commands
 
 ```
-/create [--comment Name] [--note X] [--data GB] [--days N] [--ip N] [--nodes 1,2|all|none]
+/create [--comment Name] [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none]
 /delete <id or comment>
 /stats <id or comment>
 /list [page]
-/edit <id or comment> [--comment X] [--note X] [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
+/edit <id or comment> [--comment X] [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
 /regen <id or comment>
+/configs <id or comment>
 /nodes
+/addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...] [--multiplier N]
 /editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]
+/delnode <id>
+/subnodes [node_id]
+/addsubnode --node N --inbound N [--name X] [--multiplier N]
+/editsubnode <id> [--name X] [--inbound N] [--multiplier N] [--enable] [--disable] [--move-up] [--move-down]
+/delsubnode <id>
 ```
+
+Enabling/disabling a node or sub-node removes or recreates its clients on the 3x-ui panel. The subscription URL browser page shows individual per-node config URLs and QR codes.
 
 ## Configuration
 
@@ -114,9 +123,18 @@ The `errors` array lists any nodes that failed to receive the client — the sub
 |---|---|---|
 | `GET` | `/api/nodes` | List all nodes (password omitted) |
 | `POST` | `/api/nodes` | Add a node |
-| `PUT` | `/api/nodes/<id>` | Update node fields. Supports `enabled` (0 or 1) to disable/enable the node |
+| `PUT` | `/api/nodes/<id>` | Update node fields. Setting `enabled=0` deletes all clients from 3x-ui; `enabled=1` recreates them |
 | `DELETE` | `/api/nodes/<id>` | Delete a node |
-| `GET` | `/api/nodes/<id>/test` | Test connection and inbound reachability |
+| `PUT` | `/api/nodes/reorder` | Reorder nodes. Body: `{"node_ids": [1, 2, 3]}` |
+| `GET` | `/api/nodes/<id>/test` | Test connection to node |
+| `GET` | `/api/nodes/<id>/inbounds` | List sub-nodes for a node |
+| `POST` | `/api/nodes/<id>/inbounds` | Add a sub-node. Body: `{"inbound_id": 1, "name": "...", "traffic_multiplier": 1.0}` |
+| `PUT` | `/api/nodes/<id>/inbounds/<ni_id>` | Update sub-node. Setting `enabled=0` deletes all clients; `enabled=1` recreates them. Changing `traffic_multiplier` preserves prior traffic at old rate |
+| `DELETE` | `/api/nodes/<id>/inbounds/<ni_id>` | Delete a sub-node |
+| `PUT` | `/api/nodes/<id>/inbounds/reorder` | Reorder sub-nodes. Body: `{"ni_ids": [1, 2, 3]}` |
+| `GET` | `/api/nodes/<id>/inbounds/<ni_id>/test` | Test sub-node connection and inbound reachability |
+| `GET` | `/api/subscriptions/<id>/configs` | Get all per-node config URLs for a subscription |
+| `PUT` | `/api/subscriptions/<id>/nodes/reorder` | Reorder a subscription's nodes. Body: `{"node_ids": [1, 2, 3]}` |
 
 **Add node — request body:**
 ```json
@@ -262,7 +280,15 @@ The CLI uses [rich](https://github.com/Textualize/rich) for colored terminal out
 | `ghostgate regen <id\|comment>` | Regenerate the subscription nanoid (old URL stops working) |
 | `ghostgate delete <id\|comment>` | Delete a subscription and remove its clients from all nodes |
 | `ghostgate nodes` | List all configured nodes |
-| `ghostgate editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]` | Edit or enable/disable a node |
+| `ghostgate addnode --name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...] [--multiplier N]` | Add a node and create its first sub-node |
+| `ghostgate editnode <id> [--name X] [--addr X] [--user X] [--pass X] [--proxy X] [--enable] [--disable]` | Edit or enable/disable a node (enable/disable removes/recreates all its clients) |
+| `ghostgate delnode <id>` | Delete a node |
+| `ghostgate subnodes [node_id]` | List sub-nodes |
+| `ghostgate addsubnode --node N --inbound N [--name X] [--multiplier N]` | Add a sub-node |
+| `ghostgate editsubnode <id> [--name X] [--inbound N] [--multiplier N] [--enable] [--disable] [--move-up] [--move-down]` | Edit sub-node; enable/disable removes/recreates clients; multiplier changes preserve prior usage at old rate |
+| `ghostgate delsubnode <id>` | Delete a sub-node |
+| `ghostgate configs <id\|comment>` | Show per-node config URLs for a subscription |
+| `ghostgate bot [--enable\|--disable]` | Show or toggle the Telegram bot (restart required) |
 | `ghostgate update` | Check for an update and apply it if available |
 
 **Examples:**
@@ -276,10 +302,20 @@ ghostgate edit abc123 --data 100 --days 60
 ghostgate edit abc123 --remove-data 5 --remove-days 7
 ghostgate edit abc123 --disable
 ghostgate regen abc123
+ghostgate configs abc123
 ghostgate delete abc123
 ghostgate nodes
+ghostgate addnode --name "US-1" --addr http://1.2.3.4:54321 --user admin --pass secret --inbound 1
 ghostgate editnode 1 --disable
 ghostgate editnode 1 --enable
+ghostgate delnode 1
+ghostgate subnodes
+ghostgate addsubnode --node 1 --inbound 2 --name "CDN"
+ghostgate editsubnode 3 --multiplier 2
+ghostgate editsubnode 3 --move-up
+ghostgate editsubnode 3 --disable
+ghostgate bot --disable
+ghostgate bot --enable
 ghostgate status
 ghostgate update
 ghostgate --version
