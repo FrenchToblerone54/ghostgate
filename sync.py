@@ -36,7 +36,10 @@ def _sync_once():
             except Exception as e:
                 logger.warning(f"sync error node {sn['node_id']} sub {sid}: {e}")
         total_effective = int(total_effective)
-        db.update_sub(sid, used_bytes=total_effective)
+        prev_used = sub.get("used_bytes") or 0
+        traffic_changed = total_effective != prev_used
+        if traffic_changed:
+            db.update_sub(sid, used_bytes=total_effective)
         limit_bytes = int(sub["data_gb"] * 1073741824) if sub["data_gb"] > 0 else 0
         now = datetime.now(timezone.utc)
         is_expired = bool(sub.get("expire_at")) and datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc) < now
@@ -67,7 +70,7 @@ def _sync_once():
                         db.set_sub_node_disabled(sid, sn["node_id"], False)
                     except Exception as e:
                         logger.warning(f"re-enable error node {sn['node_id']} sub {sid}: {e}")
-                if limit_bytes > 0:
+                if limit_bytes > 0 and traffic_changed:
                     mult = sn.get("traffic_multiplier") or 1.0
                     node_limit = int(node_bytes.get(sn["node_id"], 0) + remaining / mult)
                     try:
