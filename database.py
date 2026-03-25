@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import json
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from nanoid import generate
@@ -18,7 +19,7 @@ def _conn():
     finally:
         c.close()
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 def init_db():
     with _conn() as c:
@@ -63,6 +64,7 @@ CREATE TABLE subscriptions (
     enabled INTEGER DEFAULT 1,
     show_multiplier INTEGER DEFAULT 1,
     expire_after_first_use_seconds INTEGER DEFAULT 0,
+    tags TEXT DEFAULT '[]',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE subscription_nodes (
@@ -211,6 +213,10 @@ FROM nodes n""")
             if not _col_exists("subscription_nodes", "traffic_baseline"):
                 c.execute("ALTER TABLE subscription_nodes ADD COLUMN traffic_baseline INTEGER DEFAULT 0")
             c.execute("PRAGMA user_version=7")
+        if user_ver < 8:
+            if not _col_exists("subscriptions", "tags"):
+                c.execute("ALTER TABLE subscriptions ADD COLUMN tags TEXT DEFAULT '[]'")
+            c.execute("PRAGMA user_version=8")
 
 def add_node(name, address, username, password, proxy_url=None):
     with _conn() as c:
@@ -291,17 +297,18 @@ def delete_node_inbound(ni_id):
     with _conn() as c:
         c.execute("DELETE FROM node_inbounds WHERE id=?", (ni_id,))
 
-def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True, show_multiplier=1, expire_after_first_use_seconds=0, note=None):
+def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True, show_multiplier=1, expire_after_first_use_seconds=0, note=None, tags=None):
     sub_id = sub_id or generate(size=20)
     expire_at = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat() if days > 0 and not expire_after_first_use_seconds else None
+    tags_json = json.dumps(tags if isinstance(tags, list) else [])
     with _conn() as c:
         c.execute(
-            "INSERT INTO subscriptions (id, comment, note, data_gb, days, ip_limit, expire_at, enabled, show_multiplier, expire_after_first_use_seconds) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (sub_id, comment, note or None, data_gb, days, ip_limit, expire_at, int(enabled), max(1, int(show_multiplier)), int(expire_after_first_use_seconds))
+            "INSERT INTO subscriptions (id, comment, note, tags, data_gb, days, ip_limit, expire_at, enabled, show_multiplier, expire_after_first_use_seconds) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (sub_id, comment, note or None, tags_json, data_gb, days, ip_limit, expire_at, int(enabled), max(1, int(show_multiplier)), int(expire_after_first_use_seconds))
         )
     return sub_id
 
-def get_subs(page=1, per_page=20, search=None, sort_by=None, sort_dir="asc"):
+def get_subs(page=1, per_page=20, search=None, sort_by=None, sort_dir="asc", filter_status=None, data_above_gb=None, data_below_gb=None, tag=None):
     limit = per_page if per_page > 0 else -1
     offset = (page - 1) * per_page if per_page > 0 else 0
     _ok = {"used_bytes": "used_bytes", "expire_at": "expire_at"}
@@ -312,28 +319,53 @@ def get_subs(page=1, per_page=20, search=None, sort_by=None, sort_dir="asc"):
         order = f"{col} {'ASC' if sort_dir == 'asc' else 'DESC'}"
     else:
         order = "created_at DESC"
+    conditions = []
+    params = []
+    if search:
+        conditions.append("(id LIKE ? OR comment LIKE ?)")
+        params.extend([f"%{search}%", f"%{search}%"])
+    now = datetime.now(timezone.utc).isoformat()
+    if filter_status == "expired":
+        conditions.append("(expire_at IS NOT NULL AND expire_at < ?)")
+        params.append(now)
+    elif filter_status == "not_expired":
+        conditions.append("(expire_at IS NULL OR expire_at >= ?)")
+        params.append(now)
+    if data_above_gb is not None:
+        conditions.append("data_gb > ?")
+        params.append(data_above_gb)
+    if data_below_gb is not None:
+        conditions.append("data_gb > 0 AND data_gb < ?")
+        params.append(data_below_gb)
+    if tag:
+        conditions.append("(tags LIKE ?)")
+        params.append(f'%"{tag}"%')
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     with _conn() as c:
-        if search:
-            rows = c.execute(
-                f"SELECT * FROM subscriptions WHERE id LIKE ? OR comment LIKE ? ORDER BY {order} LIMIT ? OFFSET ?",
-                (f"%{search}%", f"%{search}%", limit, offset)
-            ).fetchall()
-            total = c.execute(
-                "SELECT COUNT(*) FROM subscriptions WHERE id LIKE ? OR comment LIKE ?",
-                (f"%{search}%", f"%{search}%")
-            ).fetchone()[0]
-        else:
-            rows = c.execute(
-                f"SELECT * FROM subscriptions ORDER BY {order} LIMIT ? OFFSET ?",
-                (limit, offset)
-            ).fetchall()
-            total = c.execute("SELECT COUNT(*) FROM subscriptions").fetchone()[0]
-        return [dict(r) for r in rows], total
+        rows = c.execute(
+            f"SELECT * FROM subscriptions {where} ORDER BY {order} LIMIT ? OFFSET ?",
+            (*params, limit, offset)
+        ).fetchall()
+        total = c.execute(f"SELECT COUNT(*) FROM subscriptions {where}", (*params,)).fetchone()[0]
+        result = [dict(r) for r in rows]
+        for r in result:
+            try:
+                r["tags"] = json.loads(r.get("tags") or "[]")
+            except Exception:
+                r["tags"] = []
+        return result, total
 
 def get_sub(sub_id):
     with _conn() as c:
         r = c.execute("SELECT * FROM subscriptions WHERE id=?", (sub_id,)).fetchone()
-        return dict(r) if r else None
+        if not r:
+            return None
+        d = dict(r)
+        try:
+            d["tags"] = json.loads(d.get("tags") or "[]")
+        except Exception:
+            d["tags"] = []
+        return d
 
 def get_sub_by_comment(comment):
     with _conn() as c:
@@ -341,8 +373,10 @@ def get_sub_by_comment(comment):
         return dict(r) if r else None
 
 def update_sub(sub_id, **kwargs):
-    allowed = {"comment", "note", "data_gb", "days", "ip_limit", "used_bytes", "expire_at", "enabled", "show_multiplier", "expire_after_first_use_seconds"}
+    allowed = {"comment", "note", "tags", "data_gb", "days", "ip_limit", "used_bytes", "expire_at", "enabled", "show_multiplier", "expire_after_first_use_seconds"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if "tags" in fields:
+        fields["tags"] = json.dumps(fields["tags"] if isinstance(fields["tags"], list) else [])
     if "days" in kwargs and kwargs["days"] > 0 and "expire_at" not in kwargs and not fields.get("expire_after_first_use_seconds"):
         fields["expire_at"] = (datetime.now(timezone.utc) + timedelta(days=int(kwargs["days"]))).isoformat()
     if not fields:
@@ -350,6 +384,19 @@ def update_sub(sub_id, **kwargs):
     sets = ", ".join(f"{k}=?" for k in fields)
     with _conn() as c:
         c.execute(f"UPDATE subscriptions SET {sets} WHERE id=?", (*fields.values(), sub_id))
+
+def get_all_tags():
+    with _conn() as c:
+        rows = c.execute("SELECT tags FROM subscriptions WHERE tags IS NOT NULL AND tags != '[]' AND tags != 'null'").fetchall()
+        tags = set()
+        for r in rows:
+            try:
+                for t in json.loads(r[0] or "[]"):
+                    if t:
+                        tags.add(t)
+            except Exception:
+                pass
+        return sorted(tags)
 
 def delete_sub(sub_id):
     with _conn() as c:

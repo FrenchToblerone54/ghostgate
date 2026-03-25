@@ -82,6 +82,11 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .badge-muted{color:var(--text2);border-color:var(--border2);background:rgba(255,255,255,0.03)}
 .badge-blue{color:var(--blue);border-color:rgba(59,130,246,0.25);background:var(--blue-dim)}
 .badge-yellow{color:var(--warning);border-color:rgba(245,158,11,0.25);background:var(--warning-dim)}
+.badge-tag{color:#a78bfa;border-color:rgba(167,139,250,0.25);background:rgba(167,139,250,0.1);cursor:pointer}
+.tag-chips{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.tag-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:12px;font-size:0.72em;font-weight:700;color:#a78bfa;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.25)}
+.tag-chip-x{cursor:pointer;opacity:0.6;font-size:0.9em;line-height:1;margin-left:1px}
+.tag-chip-x:hover{opacity:1}
 .badges{display:flex;gap:7px;flex-wrap:wrap}
 .stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border)}
 .stat-row:last-child{border-bottom:none}
@@ -370,6 +375,10 @@ Refresh
 <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 <input type="text" id="s-search" placeholder="Search by ID or comment..." oninput="onSearch(this.value)">
 </div>
+<select class="fi" id="s-filter-status" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="onFilterChange()"><option value="">All Status</option><option value="expired">Expired</option><option value="not_expired">Not Expired</option></select>
+<select class="fi" id="s-filter-tag" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="onFilterChange()"><option value="">All Tags</option></select>
+<input class="fi" id="s-filter-data-above" type="number" min="0" step="0.1" placeholder="Data > GB" style="width:90px;padding:6px 8px;font-size:0.82em" oninput="onFilterChangeDebounce()">
+<input class="fi" id="s-filter-data-below" type="number" min="0" step="0.1" placeholder="Data < GB" style="width:90px;padding:6px 8px;font-size:0.82em" oninput="onFilterChangeDebounce()">
 <button class="btn btn-accent" onclick="openCreate()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New</button>
 </div>
 <div style="display:flex;align-items:center;gap:8px">
@@ -405,13 +414,16 @@ Refresh
 <button class="btn btn-ghost btn-sm" onclick="bulkNoDataLimit()">No Limit</button>
 <input class="fi" id="bulk-note" type="text" placeholder="note" style="width:110px;padding:5px 8px;font-size:0.82em">
 <button class="btn btn-ghost btn-sm" onclick="bulkSetNote()">Set Note</button>
+<input class="fi" id="bulk-tag" type="text" placeholder="tag" style="width:90px;padding:5px 8px;font-size:0.82em">
+<button class="btn btn-ghost btn-sm" onclick="bulkTags('add')">+Tag</button>
+<button class="btn btn-danger btn-sm" onclick="bulkTags('remove')">-Tag</button>
 <button class="btn btn-danger btn-sm" onclick="bulkDelete()">Delete</button>
 <button class="btn btn-ghost btn-sm" onclick="clearBulk()">Clear</button>
 </div>
 <div class="card">
 <div class="table-wrap">
 <table class="tbl">
-<thead><tr><th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAllSubs(this.checked)" style="accent-color:var(--accent)"></th><th>ID</th><th>Comment</th><th id="th-data" class="sortable" onclick="sortSubs('used_bytes')">Data</th><th id="th-expires" class="sortable" onclick="sortSubs('expire_at')">Expires</th><th>Note</th><th>Nodes</th><th>Status</th><th></th></tr></thead>
+<thead><tr><th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAllSubs(this.checked)" style="accent-color:var(--accent)"></th><th>ID</th><th>Comment</th><th id="th-data" class="sortable" onclick="sortSubs('used_bytes')">Data</th><th id="th-expires" class="sortable" onclick="sortSubs('expire_at')">Expires</th><th>Note</th><th>Tags</th><th>Nodes</th><th>Status</th><th></th></tr></thead>
 <tbody id="s-tbody"></tbody>
 </table>
 </div>
@@ -493,6 +505,7 @@ Refresh
 <div id="mc-alert" class="alert"></div>
 <div class="fg"><label class="fl">Comment / Name</label><input class="fi" id="mc-comment" placeholder="e.g. John Doe"></div>
 <div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="mc-note" placeholder="Note, leave blank to hide"></div>
+<div class="fg"><label class="fl">Tags (comma-separated, admin only)</label><input class="fi" id="mc-tags" placeholder="e.g. premium, europe"></div>
 <div class="fr">
 <div class="fg"><label class="fl">Data Limit (GB, 0=∞)</label><input class="fi" id="mc-data" type="number" value="0" min="0" step="0.1"></div>
 <div class="fg"><label class="fl">Validity (days, 0=∞)</label><input class="fi" id="mc-days" type="number" value="30" min="0"></div>
@@ -517,6 +530,7 @@ Refresh
 <div id="me-alert" class="alert"></div>
 <div class="fg"><label class="fl">Comment</label><input class="fi" id="me-comment"></div>
 <div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="me-note" placeholder="Note, leave blank to hide"></div>
+<div class="fg"><label class="fl">Tags (comma-separated, admin only)</label><input class="fi" id="me-tags" placeholder="e.g. premium, europe"></div>
 <div class="fr">
 <div class="fg"><label class="fl">Data Limit (GB)</label><input class="fi" id="me-data" type="number" min="0" step="0.1"></div>
 <div class="fg"><label class="fl">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0"></div>
@@ -603,7 +617,7 @@ Refresh
 
 <script>
 const API="{{prefix}}";
-let sPage=1,sTotalPages=1,sSearch="",sTimer=null,sPerPage=20,sSort=null,sSortDir="asc";
+let sPage=1,sTotalPages=1,sSearch="",sTimer=null,sPerPage=20,sSort=null,sSortDir="asc",sFilterStatus="",sFilterTag="",sFilterDataAbove="",sFilterDataBelow="";
 let editingSubId=null,editingNodeId=null,editingNiId=null,editingInboundNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set(),_nodeOrder=[],detailSubId=null;
 let logStream=null,liveLog=false;
 let subsStream=null;
@@ -625,7 +639,7 @@ function nav(name,btn){
   document.getElementById("page-"+name).classList.add("active");
   if(btn) btn.classList.add("active");
   closeSidebar();
-  if(name==="subs"){loadSubs();startSubsStream();}
+  if(name==="subs"){loadSubs();startSubsStream();loadTagFilter();}
   else if(name==="nodes") loadNodes();
   else if(name==="logs"){ if(logStream){logStream.close();logStream=null;liveLog=false;document.getElementById("live-btn").textContent="▶ Live";} loadLogs(); }
   else if(name==="settings") loadSettings();
@@ -706,16 +720,26 @@ evt.onerror=function(){
 };
 
 function onSearch(v){ clearTimeout(sTimer); sTimer=setTimeout(()=>{ sSearch=v; sPage=1; loadSubs(); },350); }
+function onFilterChange(){sFilterStatus=document.getElementById("s-filter-status").value;sFilterTag=document.getElementById("s-filter-tag").value;sFilterDataAbove=document.getElementById("s-filter-data-above").value;sFilterDataBelow=document.getElementById("s-filter-data-below").value;sPage=1;loadSubs();}
+function onFilterChangeDebounce(){clearTimeout(sTimer);sTimer=setTimeout(onFilterChange,350);}
+function setTagFilter(tag){document.getElementById("s-filter-tag").value=tag;onFilterChange();}
+function _refreshTagFilter(tags){const sel=document.getElementById("s-filter-tag");const cur=sel.value;sel.innerHTML='<option value="">All Tags</option>'+tags.map(t=>`<option value="${t}"${t===cur?" selected":""}>${t}</option>`).join("");}
+async function loadTagFilter(){const tags=await fetch(API+"/api/tags").then(r=>r.json());_refreshTagFilter(tags);}
+async function bulkTags(action){const n=selectedSubs.size;const tag=(document.getElementById("bulk-tag").value||"").trim();if(!tag)return;await fetch(API+"/api/bulk/tags",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sub_ids:[...selectedSubs],tag,action})});loadSubs();loadTagFilter();showAlert("s-alert",(action==="add"?"Added":"Removed")+" tag '"+tag+"' "+(action==="add"?"to":"from")+" "+n+" subscriptions","ok");}
 
 async function loadSubs(){
   const qs=new URLSearchParams({page:sPage,per_page:sPerPage,search:sSearch||""});
-  if(sSort) { qs.set("sort_by",sSort); qs.set("sort_dir",sSortDir); }
+  if(sSort){qs.set("sort_by",sSort);qs.set("sort_dir",sSortDir);}
+  if(sFilterStatus)qs.set("filter_status",sFilterStatus);
+  if(sFilterTag)qs.set("tag",sFilterTag);
+  if(sFilterDataAbove)qs.set("data_above_gb",sFilterDataAbove);
+  if(sFilterDataBelow)qs.set("data_below_gb",sFilterDataBelow);
   const r=await fetch(API+"/api/subscriptions?"+qs).then(x=>x.json());
   const subs=r.subs||[];
   sTotalPages=sPerPage===0?1:Math.max(1,Math.ceil(r.total/r.per_page));
   renderPag("pag-top"); renderPag("pag-bot");
   updateSortHeaders();
-  if(subs.length===0){ document.getElementById("s-tbody").innerHTML='<tr><td colspan="9"><div class="empty-state"><p>No subscriptions found.</p></div></td></tr>'; return; }
+  if(subs.length===0){document.getElementById("s-tbody").innerHTML='<tr><td colspan="10"><div class="empty-state"><p>No subscriptions found.</p></div></td></tr>';return;}
   document.getElementById("s-tbody").innerHTML=subs.map(renderSubRow).join("");
 }
 function renderSubRow(sub){
@@ -740,6 +764,7 @@ function renderSubRow(sub){
   const expStr=sub.expire_at?sub.expire_at.substring(0,10):(firstuseSec>0?`${firstuseDays}d after 1st use`:"Never");
   const expTip=sub.expire_at?`Exact expiry: ${sub.expire_at}`:(firstuseSec>0?`Expiry starts after first use (${firstuseDays} days)`:"No expiry set");
   const noteCell=sub.note?`<span style="font-size:0.82em;color:var(--text2)">${sub.note}</span>`:'';
+  const tagsCell=(sub.tags&&sub.tags.length)?sub.tags.map(t=>`<span class="badge badge-tag" style="font-size:0.7em;cursor:pointer" onclick="setTagFilter('${t}')" title="Filter by tag">${t}</span>`).join(" "):'';
   return `<tr data-sub-id="${sub.id}">
 <td><input type="checkbox" class="sub-chk" value="${sub.id}" onchange="toggleSubSel('${sub.id}',this.checked)" ${selectedSubs.has(sub.id)?"checked":""} style="accent-color:var(--accent)"></td>
 <td><span class="tbl-id">${sub.id.substring(0,12)}…</span></td>
@@ -747,6 +772,7 @@ function renderSubRow(sub){
 <td>${dataCol}</td>
 <td style="font-size:0.84em;color:var(--text2);cursor:pointer" title="${expTip}" onclick="alert(this.title)">${expStr}</td>
 <td>${noteCell}</td>
+<td>${tagsCell}</td>
 <td>${nodes}</td>
 <td>${statusBadge}</td>
 <td><div class="tbl-actions">
@@ -793,9 +819,11 @@ async function openCreate(){
   document.getElementById("mc-ip").value="0";
   document.getElementById("mc-submit").textContent="Create";
   document.getElementById("mc-note").value="";
+  document.getElementById("mc-tags").value="";
   document.getElementById("mc-sm").value="1";
-  const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
+  const [nodes,allTags]=await Promise.all([fetch(API+"/api/nodes").then(r=>r.json()),fetch(API+"/api/tags").then(r=>r.json())]);
   document.getElementById("mc-nodes").innerHTML=_renderInboundSelector(nodes,new Set());
+  _refreshTagFilter(allTags);
   document.getElementById("m-create").classList.add("open");
 }
 
@@ -812,7 +840,8 @@ async function submitCreate(){
   const btn=document.getElementById("mc-submit");
   btn.disabled=true; btn.textContent="Creating…";
   try{
-    const r=await fetch(API+"/api/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment,note,data_gb,days,ip_limit,node_ids,show_multiplier,expire_after_first_use_seconds})}).then(x=>x.json());
+    const tags=document.getElementById("mc-tags").value.split(",").map(t=>t.trim()).filter(t=>t);
+    const r=await fetch(API+"/api/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({comment,note,data_gb,days,ip_limit,node_ids,show_multiplier,expire_after_first_use_seconds,tags})}).then(x=>x.json());
     if(r.errors&&r.errors.length>0) showAlert("mc-alert","Created (with errors): "+r.errors.join("; "),"err");
     else { closeM("m-create"); loadSubs(); showAlert("s-alert","Subscription created: "+r.id,"ok"); }
   }catch(ex){ showAlert("mc-alert","Error: "+ex,"err"); }
@@ -891,6 +920,7 @@ async function editSub(id){
   const [sub, nodes]=await Promise.all([fetch(API+"/api/subscriptions/"+id).then(r=>r.json()),fetch(API+"/api/nodes").then(r=>r.json())]);
   document.getElementById("me-comment").value=sub.comment||"";
   document.getElementById("me-note").value=sub.note||"";
+  document.getElementById("me-tags").value=(sub.tags||[]).join(", ");
   document.getElementById("me-data").value=sub.data_gb||0;
   document.getElementById("me-days").value=0; document.getElementById("me-days").disabled=false; _removeExpiry=false; document.getElementById("me-no-expire-btn").textContent="Set No Expiry"; document.getElementById("me-no-expire-btn").style.color="";
   document.getElementById("me-data").disabled=false; _removeDataLimit=false; document.getElementById("me-no-limit-btn").textContent="Set No Data Limit"; document.getElementById("me-no-limit-btn").style.color="";
@@ -928,7 +958,7 @@ function setNoDataLimit(){
 }
 async function submitEdit(){
   if(!editingSubId) return;
-  const body={comment:document.getElementById("me-comment").value.trim(),note:document.getElementById("me-note").value.trim()||null,data_gb:_removeDataLimit?0:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
+  const body={comment:document.getElementById("me-comment").value.trim(),note:document.getElementById("me-note").value.trim()||null,tags:document.getElementById("me-tags").value.split(",").map(t=>t.trim()).filter(t=>t),data_gb:_removeDataLimit?0:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
   if(_removeExpiry){ body.remove_expiry=true; } else { const expDate=document.getElementById("me-expire-date").value; if(expDate){ body.expire_at=expDate; } else { const days=parseInt(document.getElementById("me-days").value)||0; if(days>0) body.days=days; else if(days<0) body.remove_days=-days; } }
   if(document.getElementById("me-firstuse").checked){ const d=parseInt(document.getElementById("me-firstuse-days").querySelector("input").value)||0; body.expire_after_first_use_seconds=Math.max(0,d*86400); } else { body.expire_after_first_use_seconds=0; }
   const checked=new Set([...document.querySelectorAll("#me-nodes input:checked")].map(i=>parseInt(i.value)));
@@ -1195,17 +1225,14 @@ async function submitInbound(){
 }
 
 async function testInboundModal(){
-  if(!editingInboundNodeId){ showAlert("mi-alert","Save node first","err"); return; }
+  if(!editingInboundNodeId){showAlert("mi-alert","Save node first","err");return;}
   const inboundId=parseInt(document.getElementById("mi-inbound").value)||1;
   const niId=editingNiId||0;
   if(niId){
     const r=await fetch(API+"/api/nodes/"+editingInboundNodeId+"/inbounds/"+niId+"/test").then(x=>x.json());
     showAlert("mi-alert",r.ok?`Connected! Protocol: ${r.protocol||"ok"}`:`Failed: ${r.error||"error"}`,r.ok?"ok":"err");
   } else {
-    const nodes=await fetch(API+"/api/nodes").then(r=>r.json());
-    const n=nodes.find(x=>x.id===editingInboundNodeId);
-    if(!n){ showAlert("mi-alert","Node not found","err"); return; }
-    const r=await fetch(API+"/api/nodes/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({address:n.address,username:n.username,password:"",inbound_id:inboundId})}).then(x=>x.json());
+    const r=await fetch(API+"/api/nodes/"+editingInboundNodeId+"/inbounds/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({inbound_id:inboundId})}).then(x=>x.json());
     showAlert("mi-alert",r.ok?`Inbound ${inboundId} ok (${r.protocol||"unknown"})`:`Failed: ${r.error||"error"}`,r.ok?"ok":"err");
   }
 }

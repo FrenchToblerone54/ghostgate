@@ -379,7 +379,11 @@ def register_routes(panel_path):
         sort_dir = request.args.get("sort_dir", "asc").strip()
         if sort_dir not in ("asc", "desc"):
             sort_dir = "asc"
-        subs, total = db.get_subs(page, per_page, search, sort_by, sort_dir)
+        filter_status = request.args.get("filter_status", "").strip() or None
+        data_above_gb = float(request.args["data_above_gb"]) if request.args.get("data_above_gb") else None
+        data_below_gb = float(request.args["data_below_gb"]) if request.args.get("data_below_gb") else None
+        tag = request.args.get("tag", "").strip() or None
+        subs, total = db.get_subs(page, per_page, search, sort_by, sort_dir, filter_status, data_above_gb, data_below_gb, tag)
         for sub in subs:
             sub["node_names"] = [sn.get("inbound_name") or sn["name"] for sn in db.get_sub_nodes(sub["id"])]
         return jsonify({"subs": subs, "total": total, "page": page, "per_page": per_page})
@@ -415,6 +419,10 @@ def register_routes(panel_path):
         return Response(_gen(), content_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+    @app.route(f"/{panel_path}/api/tags")
+    def api_tags():
+        return jsonify(db.get_all_tags())
+
     @app.route(f"/{panel_path}/api/subscriptions", methods=["POST"])
     def api_subs_create():
         data = request.json
@@ -425,8 +433,9 @@ def register_routes(panel_path):
         ip_limit = int(data.get("ip_limit", 0))
         show_multiplier = max(1, int(data.get("show_multiplier", 1)))
         expire_after_first_use_seconds = int(data.get("expire_after_first_use_seconds", 0))
+        tags = data.get("tags") if isinstance(data.get("tags"), list) else []
         node_ids = [int(n) for n in data.get("node_ids", [])]
-        sub_id = db.create_sub(comment=comment, note=note, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, expire_after_first_use_seconds=expire_after_first_use_seconds)
+        sub_id = db.create_sub(comment=comment, note=note, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, expire_after_first_use_seconds=expire_after_first_use_seconds, tags=tags)
         sub = db.get_sub(sub_id)
         client_uuid = str(uuid.uuid4())
         expire_ms = 0
@@ -469,7 +478,7 @@ def register_routes(panel_path):
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>", methods=["PUT"])
     def api_sub_update(sub_id):
         body = request.json
-        updates = {k: body[k] for k in ["comment", "note", "data_gb", "days", "ip_limit", "enabled", "show_multiplier", "expire_after_first_use_seconds"] if k in body}
+        updates = {k: body[k] for k in ["comment", "note", "tags", "data_gb", "days", "ip_limit", "enabled", "show_multiplier", "expire_after_first_use_seconds"] if k in body}
         if body.get("remove_expiry"):
             updates["expire_at"] = None
         if "expire_after_first_use_seconds" in updates and int(updates.get("expire_after_first_use_seconds") or 0)>0:
@@ -763,6 +772,26 @@ def register_routes(panel_path):
             db.update_sub(sub_id, data_gb=max(0, round(new_gb, 2)))
         return jsonify({"ok": True})
 
+    @app.route(f"/{panel_path}/api/bulk/tags", methods=["POST"])
+    def api_bulk_tags():
+        data = request.json
+        sub_ids = data.get("sub_ids", [])
+        tag = (data.get("tag") or "").strip()
+        action = data.get("action")
+        if not tag or action not in ("add", "remove"):
+            return jsonify({"error": "invalid input"}), 400
+        for sub_id in sub_ids:
+            sub = db.get_sub(sub_id)
+            if not sub:
+                continue
+            tags = sub.get("tags") if isinstance(sub.get("tags"), list) else []
+            if action == "add" and tag not in tags:
+                tags.append(tag)
+            elif action == "remove" and tag in tags:
+                tags.remove(tag)
+            db.update_sub(sub_id, tags=tags)
+        return jsonify({"ok": True})
+
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/regen-id", methods=["POST"])
     def api_sub_regen_id(sub_id):
         sub = db.get_sub(sub_id)
@@ -919,6 +948,20 @@ def register_routes(panel_path):
             xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
             ok = xui.test_connection()
             return jsonify({"ok": ok})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)})
+
+    @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds/test", methods=["POST"])
+    def api_node_inbound_new_test(node_id):
+        node = db.get_node(node_id)
+        if not node:
+            return jsonify({"ok": False, "error": "not found"}), 404
+        inbound_id = int((request.json or {}).get("inbound_id") or 1)
+        try:
+            xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
+            ok = xui.test_connection()
+            inbound = xui.get_inbound(inbound_id) if ok else None
+            return jsonify({"ok": ok, "protocol": inbound.get("protocol") if inbound else None})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)})
 
