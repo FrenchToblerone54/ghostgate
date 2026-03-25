@@ -308,7 +308,7 @@ def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled
         )
     return sub_id
 
-def get_subs(page=1, per_page=20, search=None, sort_by=None, sort_dir="asc", filter_status=None, data_above_gb=None, data_below_gb=None, tag=None):
+def get_subs(page=1, per_page=20, search=None, sort_by=None, sort_dir="asc", filter_status=None, data_above_gb=None, data_below_gb=None, tag=None, filter_enabled=None, filter_nodes=None, filter_data_usage=None, expiring_days=None):
     limit = per_page if per_page > 0 else -1
     offset = (page - 1) * per_page if per_page > 0 else 0
     _ok = {"used_bytes": "used_bytes", "expire_at": "expire_at"}
@@ -340,6 +340,22 @@ def get_subs(page=1, per_page=20, search=None, sort_by=None, sort_dir="asc", fil
     if tag:
         conditions.append("(tags LIKE ?)")
         params.append(f'%"{tag}"%')
+    if filter_enabled == 1:
+        conditions.append("enabled=1")
+    elif filter_enabled == 0:
+        conditions.append("enabled=0")
+    if filter_nodes == "has":
+        conditions.append("EXISTS (SELECT 1 FROM subscription_nodes sn WHERE sn.sub_id=subscriptions.id)")
+    elif filter_nodes == "none":
+        conditions.append("NOT EXISTS (SELECT 1 FROM subscription_nodes sn WHERE sn.sub_id=subscriptions.id)")
+    if filter_data_usage == "over":
+        conditions.append("data_gb>0 AND used_bytes>=CAST(data_gb*1073741824 AS INTEGER)")
+    elif filter_data_usage == "under":
+        conditions.append("(data_gb=0 OR used_bytes<CAST(data_gb*1073741824 AS INTEGER))")
+    if expiring_days is not None:
+        soon = (datetime.now(timezone.utc) + timedelta(days=expiring_days)).isoformat()
+        conditions.append("(expire_at IS NOT NULL AND expire_at>? AND expire_at<=?)")
+        params.extend([now, soon])
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     with _conn() as c:
         rows = c.execute(

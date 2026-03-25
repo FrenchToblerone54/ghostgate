@@ -383,7 +383,11 @@ def register_routes(panel_path):
         data_above_gb = float(request.args["data_above_gb"]) if request.args.get("data_above_gb") else None
         data_below_gb = float(request.args["data_below_gb"]) if request.args.get("data_below_gb") else None
         tag = request.args.get("tag", "").strip() or None
-        subs, total = db.get_subs(page, per_page, search, sort_by, sort_dir, filter_status, data_above_gb, data_below_gb, tag)
+        filter_enabled = int(request.args["filter_enabled"]) if request.args.get("filter_enabled") in ("0", "1") else None
+        filter_nodes = request.args.get("filter_nodes", "").strip() or None
+        filter_data_usage = request.args.get("filter_data_usage", "").strip() or None
+        expiring_days = int(request.args["expiring_days"]) if request.args.get("expiring_days") else None
+        subs, total = db.get_subs(page, per_page, search, sort_by, sort_dir, filter_status, data_above_gb, data_below_gb, tag, filter_enabled, filter_nodes, filter_data_usage, expiring_days)
         for sub in subs:
             sub["node_names"] = [sn.get("inbound_name") or sn["name"] for sn in db.get_sub_nodes(sub["id"])]
         return jsonify({"subs": subs, "total": total, "page": page, "per_page": per_page})

@@ -376,6 +376,10 @@ Refresh
 <input type="text" id="s-search" placeholder="Search by ID or comment..." oninput="onSearch(this.value)">
 </div>
 <select class="fi" id="s-filter-status" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="onFilterChange()"><option value="">All Status</option><option value="expired">Expired</option><option value="not_expired">Not Expired</option></select>
+<select class="fi" id="s-filter-enabled" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="onFilterChange()"><option value="">Enabled+Disabled</option><option value="1">Enabled</option><option value="0">Disabled</option></select>
+<select class="fi" id="s-filter-nodes" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="onFilterChange()"><option value="">All Nodes</option><option value="has">Has Nodes</option><option value="none">No Nodes</option></select>
+<select class="fi" id="s-filter-data-usage" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="onFilterChange()"><option value="">All Usage</option><option value="over">Over Limit</option><option value="under">Under Limit</option></select>
+<select class="fi" id="s-filter-expiring" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="onFilterChange()"><option value="">Any Expiry</option><option value="7">Expiring &lt; 7d</option><option value="14">Expiring &lt; 14d</option><option value="30">Expiring &lt; 30d</option></select>
 <select class="fi" id="s-filter-tag" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="onFilterChange()"><option value="">All Tags</option></select>
 <input class="fi" id="s-filter-data-above" type="number" min="0" step="0.1" placeholder="Data > GB" style="width:90px;padding:6px 8px;font-size:0.82em" oninput="onFilterChangeDebounce()">
 <input class="fi" id="s-filter-data-below" type="number" min="0" step="0.1" placeholder="Data < GB" style="width:90px;padding:6px 8px;font-size:0.82em" oninput="onFilterChangeDebounce()">
@@ -617,7 +621,7 @@ Refresh
 
 <script>
 const API="{{prefix}}";
-let sPage=1,sTotalPages=1,sSearch="",sTimer=null,sPerPage=20,sSort=null,sSortDir="asc",sFilterStatus="",sFilterTag="",sFilterDataAbove="",sFilterDataBelow="";
+let sPage=1,sTotalPages=1,sSearch="",sTimer=null,sPerPage=20,sSort=null,sSortDir="asc",sFilterStatus="",sFilterTag="",sFilterDataAbove="",sFilterDataBelow="",sFilterEnabled="",sFilterNodes="",sFilterDataUsage="",sFilterExpiringDays="";
 let editingSubId=null,editingNodeId=null,editingNiId=null,editingInboundNodeId=null,editingOrigNodes=new Set(),selectedSubs=new Set(),_nodeOrder=[],detailSubId=null;
 let logStream=null,liveLog=false;
 let subsStream=null;
@@ -720,7 +724,7 @@ evt.onerror=function(){
 };
 
 function onSearch(v){ clearTimeout(sTimer); sTimer=setTimeout(()=>{ sSearch=v; sPage=1; loadSubs(); },350); }
-function onFilterChange(){sFilterStatus=document.getElementById("s-filter-status").value;sFilterTag=document.getElementById("s-filter-tag").value;sFilterDataAbove=document.getElementById("s-filter-data-above").value;sFilterDataBelow=document.getElementById("s-filter-data-below").value;sPage=1;loadSubs();}
+function onFilterChange(){sFilterStatus=document.getElementById("s-filter-status").value;sFilterTag=document.getElementById("s-filter-tag").value;sFilterDataAbove=document.getElementById("s-filter-data-above").value;sFilterDataBelow=document.getElementById("s-filter-data-below").value;sFilterEnabled=document.getElementById("s-filter-enabled").value;sFilterNodes=document.getElementById("s-filter-nodes").value;sFilterDataUsage=document.getElementById("s-filter-data-usage").value;sFilterExpiringDays=document.getElementById("s-filter-expiring").value;sPage=1;loadSubs();}
 function onFilterChangeDebounce(){clearTimeout(sTimer);sTimer=setTimeout(onFilterChange,350);}
 function setTagFilter(tag){document.getElementById("s-filter-tag").value=tag;onFilterChange();}
 function _refreshTagFilter(tags){const sel=document.getElementById("s-filter-tag");const cur=sel.value;sel.innerHTML='<option value="">All Tags</option>'+tags.map(t=>`<option value="${t}"${t===cur?" selected":""}>${t}</option>`).join("");}
@@ -734,6 +738,10 @@ async function loadSubs(){
   if(sFilterTag)qs.set("tag",sFilterTag);
   if(sFilterDataAbove)qs.set("data_above_gb",sFilterDataAbove);
   if(sFilterDataBelow)qs.set("data_below_gb",sFilterDataBelow);
+  if(sFilterEnabled!=="")qs.set("filter_enabled",sFilterEnabled);
+  if(sFilterNodes)qs.set("filter_nodes",sFilterNodes);
+  if(sFilterDataUsage)qs.set("filter_data_usage",sFilterDataUsage);
+  if(sFilterExpiringDays)qs.set("expiring_days",sFilterExpiringDays);
   const r=await fetch(API+"/api/subscriptions?"+qs).then(x=>x.json());
   const subs=r.subs||[];
   sTotalPages=sPerPage===0?1:Math.max(1,Math.ceil(r.total/r.per_page));
