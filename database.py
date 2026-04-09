@@ -476,6 +476,20 @@ def reset_sub_node_disabled(sub_id):
     with _conn() as c:
         c.execute("UPDATE subscription_nodes SET client_disabled=0 WHERE sub_id=?", (sub_id,))
 
+def get_sub_nodes_for_node(node_id):
+    with _conn() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT sn.sub_id, sn.node_id, sn.client_uuid, sn.email, sn.client_disabled, "
+            "sn.traffic_offset, sn.traffic_baseline, "
+            "ni.inbound_id, ni.name AS inbound_name, ni.traffic_multiplier, "
+            "n.name, n.address, n.username, n.password, n.proxy_url, n.enabled "
+            "FROM subscription_nodes sn "
+            "JOIN node_inbounds ni ON sn.node_id=ni.id "
+            "JOIN nodes n ON ni.node_id=n.id "
+            "WHERE n.id=?",
+            (node_id,)
+        )]
+
 def get_sub_nodes_for_inbound(ni_id):
     with _conn() as c:
         return [dict(r) for r in c.execute(

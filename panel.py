@@ -951,6 +951,20 @@ def register_routes(panel_path):
 
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>", methods=["DELETE"])
     def api_node_delete(node_id):
+        snodes = db.get_sub_nodes_for_node(node_id)
+        _xui = {}
+        for sn in snodes:
+            key = (sn["address"], sn["username"])
+            if key not in _xui:
+                _xui[key] = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+            try:
+                t = _xui[key].get_client_traffic(sn["email"])
+                if t:
+                    raw = (t.get("up") or 0) + (t.get("down") or 0)
+                    effective = (sn.get("traffic_offset") or 0.0) + max(0, raw - (sn.get("traffic_baseline") or 0)) * (sn.get("traffic_multiplier") or 1.0)
+                    db.add_sub_preserved_traffic(sn["sub_id"], effective)
+            except Exception:
+                pass
         db.delete_node(node_id)
         return jsonify({"ok": True})
 
