@@ -19,7 +19,7 @@ def _conn():
     finally:
         c.close()
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 def init_db():
     with _conn() as c:
@@ -217,6 +217,10 @@ FROM nodes n""")
             if not _col_exists("subscriptions", "tags"):
                 c.execute("ALTER TABLE subscriptions ADD COLUMN tags TEXT DEFAULT '[]'")
             c.execute("PRAGMA user_version=8")
+        if user_ver < 9:
+            if not _col_exists("subscriptions", "traffic_preserved"):
+                c.execute("ALTER TABLE subscriptions ADD COLUMN traffic_preserved REAL DEFAULT 0")
+            c.execute("PRAGMA user_version=9")
 
 def add_node(name, address, username, password, proxy_url=None):
     with _conn() as c:
@@ -389,7 +393,7 @@ def get_sub_by_comment(comment):
         return dict(r) if r else None
 
 def update_sub(sub_id, **kwargs):
-    allowed = {"comment", "note", "tags", "data_gb", "days", "ip_limit", "used_bytes", "expire_at", "enabled", "show_multiplier", "expire_after_first_use_seconds"}
+    allowed = {"comment", "note", "tags", "data_gb", "days", "ip_limit", "used_bytes", "expire_at", "enabled", "show_multiplier", "expire_after_first_use_seconds", "traffic_preserved"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if "tags" in fields:
         fields["tags"] = json.dumps(fields["tags"] if isinstance(fields["tags"], list) else [])
@@ -489,6 +493,19 @@ def get_sub_nodes_for_inbound(ni_id):
 def set_sub_node_traffic_offset(sub_id, node_id, offset, baseline):
     with _conn() as c:
         c.execute("UPDATE subscription_nodes SET traffic_offset=?, traffic_baseline=? WHERE sub_id=? AND node_id=?", (float(offset), int(baseline), sub_id, node_id))
+
+def update_sub_node_uuid(sub_id, node_id, new_uuid):
+    with _conn() as c:
+        c.execute("UPDATE subscription_nodes SET client_uuid=? WHERE sub_id=? AND node_id=?", (new_uuid, sub_id, node_id))
+
+def add_sub_preserved_traffic(sub_id, amount):
+    with _conn() as c:
+        c.execute("UPDATE subscriptions SET traffic_preserved=COALESCE(traffic_preserved,0)+? WHERE id=?", (float(amount), sub_id))
+
+def reset_sub_traffic(sub_id):
+    with _conn() as c:
+        c.execute("UPDATE subscriptions SET used_bytes=0, traffic_preserved=0 WHERE id=?", (sub_id,))
+        c.execute("UPDATE subscription_nodes SET traffic_offset=0, traffic_baseline=0 WHERE sub_id=?", (sub_id,))
 
 def reorder_sub_nodes(sub_id, node_ids):
     with _conn() as c:

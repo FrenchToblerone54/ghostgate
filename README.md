@@ -37,6 +37,8 @@ Save the panel URL shown at the end — it is your admin panel access path.
 /list [page]
 /edit <id or comment> [--comment X] [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--ip N] [--enable] [--disable]
 /regen <id or comment>
+/reguuid <id or comment>
+/resettraffic <id or comment>
 /configs <id or comment>
 /nodes
 /addnode --name X --addr http://... --user X --pass X --inbound N [--proxy http://...] [--multiplier N]
@@ -92,6 +94,8 @@ The web panel exposes a REST API at `/{panel_path}/api/`. It is protected by the
 | `POST` | `/api/subscriptions/<id>/nodes` | Add node(s) to an existing subscription |
 | `DELETE` | `/api/subscriptions/<id>/nodes/<node_id>` | Remove a node from a subscription |
 | `POST` | `/api/subscriptions/<id>/regen-id` | Regenerate the subscription nanoid (updates XUI clients). Returns `{new_id, url}` |
+| `POST` | `/api/subscriptions/<id>/regen-uuid` | Regenerate the VLESS/VMess client UUID across all nodes. Returns `{ok, uuid, errors[]}` |
+| `POST` | `/api/subscriptions/<id>/reset-traffic` | Reset traffic counters to zero in all 3x-ui nodes and the database. Re-enables clients if subscription is active. Returns `{ok}` |
 
 **Create subscription — request body:**
 ```json
@@ -129,7 +133,7 @@ The `errors` array lists any nodes that failed to receive the client — the sub
 | `GET` | `/api/nodes/<id>/test` | Test connection to node |
 | `GET` | `/api/nodes/<id>/inbounds` | List sub-nodes for a node |
 | `POST` | `/api/nodes/<id>/inbounds` | Add a sub-node. Body: `{"inbound_id": 1, "name": "...", "traffic_multiplier": 1.0}` |
-| `PUT` | `/api/nodes/<id>/inbounds/<ni_id>` | Update sub-node. Setting `enabled=0` deletes all clients; `enabled=1` recreates them. Changing `traffic_multiplier` preserves prior traffic at old rate |
+| `PUT` | `/api/nodes/<id>/inbounds/<ni_id>` | Update sub-node. Setting `enabled=0` deletes all clients; `enabled=1` recreates them. Changing `traffic_multiplier` preserves prior traffic at old rate. Changing `inbound_id` migrates all clients from the old inbound to the new one |
 | `DELETE` | `/api/nodes/<id>/inbounds/<ni_id>` | Delete a sub-node |
 | `PUT` | `/api/nodes/<id>/inbounds/reorder` | Reorder sub-nodes. Body: `{"ni_ids": [1, 2, 3]}` |
 | `GET` | `/api/nodes/<id>/inbounds/<ni_id>/test` | Test sub-node connection and inbound reachability |
@@ -155,6 +159,8 @@ The `errors` array lists any nodes that failed to receive the client — the sub
 
 Nodes already assigned to the subscription are silently skipped.
 
+Removing a node from a subscription (`DELETE /api/subscriptions/<id>/nodes/<node_id>`) preserves the traffic that node had already consumed — it is added to the subscription's internal `traffic_preserved` offset so the total usage does not drop after removal.
+
 ### Bulk Operations
 
 | Method | Endpoint | Description |
@@ -165,6 +171,7 @@ Nodes already assigned to the subscription are silently skipped.
 | `POST` | `/api/bulk/extend` | Add data (GB) and/or days to multiple subscriptions |
 | `POST` | `/api/bulk/data` | Multiply or divide the data limit of multiple subscriptions by a factor |
 | `POST` | `/api/bulk/note` | Set or clear the note on multiple subscriptions |
+| `POST` | `/api/bulk/tags` | Add or remove a tag across multiple subscriptions |
 
 **`/api/bulk/nodes` request body:**
 ```json
@@ -198,6 +205,8 @@ Returns `{"ok": true}`.
 
 Both `data_gb` and `days` are optional and additive — data is added to the current limit, days are extended from the current expiry (or from now if no expiry is set). **Negative values subtract** — e.g. `"data_gb": -5` removes 5 GB (clamped to 0), `"days": -7` removes 7 days from the current expiry (skipped if no expiry set). Pass `"remove_expiry": true` to clear the expiry date (takes priority over `days`). Pass `"remove_data_limit": true` to set unlimited data (takes priority over `data_gb`). All expiry changes are pushed to 3x-ui nodes immediately. Returns `{"ok": true}`.
 
+> **Note:** Changing `data_gb` on a subscription via `PUT /api/subscriptions/<id>` immediately recalculates and pushes per-node client limits to all 3x-ui panels. If the new limit is higher than the current usage and the subscription was over-limit, clients are re-enabled immediately without waiting for the next sync cycle.
+
 **`/api/bulk/data` request body:**
 ```json
 { "sub_ids": ["abc123", "def456"], "factor": 2, "action": "multiply" }
@@ -211,6 +220,13 @@ Both `data_gb` and `days` are optional and additive — data is added to the cur
 ```
 
 Omit `note` or pass `null` to clear it. The note is emitted as a `vless://` info entry in each subscription. Returns `{"ok": true}`.
+
+**`/api/bulk/tags` request body:**
+```json
+{ "sub_ids": ["abc123", "def456"], "tag": "premium", "action": "add" }
+```
+
+`action` is either `"add"` or `"remove"`. Returns `{"ok": true}`.
 
 ### Other
 
@@ -286,6 +302,8 @@ The CLI uses [rich](https://github.com/Textualize/rich) for colored terminal out
 | `ghostgate create --comment X [--note X] [--data GB] [--days N] [--ip N] [--nodes 1,2\|all\|none]` | Create a new subscription |
 | `ghostgate edit <id\|comment> [--data GB] [--days N] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--note X] [--ip N] [--enable] [--disable]` | Edit an existing subscription |
 | `ghostgate regen <id\|comment>` | Regenerate the subscription nanoid (old URL stops working) |
+| `ghostgate regen-uuid <id\|comment>` | Regenerate the VLESS/VMess UUID — disconnects existing clients |
+| `ghostgate reset-traffic <id\|comment>` | Reset traffic counters to zero in all 3x-ui nodes |
 | `ghostgate delete <id\|comment>` | Delete a subscription and remove its clients from all nodes |
 | `ghostgate nodes` | List all configured nodes |
 | `ghostgate addnode --name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...] [--multiplier N]` | Add a node and create its first sub-node |

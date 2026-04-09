@@ -1,6 +1,7 @@
 import threading
 import time
 import logging
+import uuid
 from datetime import datetime, timezone
 import database as db
 from xui_client import XUIClient
@@ -13,6 +14,7 @@ def _sync_once():
     nodes_by_sub = {}
     for sn in all_snodes:
         nodes_by_sub.setdefault(sn["sub_id"], []).append(sn)
+    _xui_sessions = {}
     for sub in subs:
         sid = sub["id"]
         snodes = nodes_by_sub.get(sid, [])
@@ -23,7 +25,10 @@ def _sync_once():
         total_effective = 0
         for sn in snodes:
             try:
-                xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                key = (sn["address"], sn["username"])
+                if key not in _xui_sessions:
+                    _xui_sessions[key] = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                xui = _xui_sessions[key]
                 xui_clients[sn["node_id"]] = xui
                 t = xui.get_client_traffic(sn["email"])
                 if t:
@@ -35,6 +40,7 @@ def _sync_once():
                     total_effective += offset + adjusted_raw * (sn.get("traffic_multiplier") or 1.0)
             except Exception as e:
                 logger.warning(f"sync error node {sn['node_id']} sub {sid}: {e}")
+        total_effective += float(sub.get("traffic_preserved") or 0)
         total_effective = int(total_effective)
         prev_used = sub.get("used_bytes") or 0
         traffic_changed = total_effective != prev_used
@@ -47,6 +53,7 @@ def _sync_once():
         if sub.get("enabled") == 0:
             pass
         elif is_expired or is_over_limit:
+            new_uuid = str(uuid.uuid4())
             for sn in snodes:
                 if sn.get("client_disabled"):
                     continue
@@ -54,8 +61,14 @@ def _sync_once():
                 if not xui:
                     continue
                 try:
-                    xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], False)
-                    db.set_sub_node_disabled(sid, sn["node_id"], True)
+                    ok = xui.rotate_client_uuid(sn["inbound_id"], sn["client_uuid"], sn["email"], new_uuid, enabled=False)
+                    if ok:
+                        db.update_sub_node_uuid(sid, sn["node_id"], new_uuid)
+                        db.set_sub_node_disabled(sid, sn["node_id"], True)
+                    else:
+                        ok2 = xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], False)
+                        if ok2:
+                            db.set_sub_node_disabled(sid, sn["node_id"], True)
                 except Exception as e:
                     logger.warning(f"disable error node {sn['node_id']} sub {sid}: {e}")
         else:
@@ -66,8 +79,9 @@ def _sync_once():
                     continue
                 if sn.get("client_disabled"):
                     try:
-                        xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], True)
-                        db.set_sub_node_disabled(sid, sn["node_id"], False)
+                        ok = xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], True)
+                        if ok:
+                            db.set_sub_node_disabled(sid, sn["node_id"], False)
                     except Exception as e:
                         logger.warning(f"re-enable error node {sn['node_id']} sub {sid}: {e}")
                 if limit_bytes > 0 and traffic_changed:

@@ -383,6 +383,16 @@ async def cmd_addsubnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not node:
         await update.message.reply_text("Node not found.")
         return
+    try:
+        xui=XUIClient(node["address"],node["username"],node["password"],node.get("proxy_url"))
+        inbound=xui.get_inbound(inbound_id)
+        proto=(inbound.get("protocol") or "").lower() if inbound else ""
+        if proto not in ("vless","vmess"):
+            await update.message.reply_text(f"Unsupported protocol '{proto}': only vless and vmess are supported.")
+            return
+    except Exception as e:
+        await update.message.reply_text(f"Failed to verify inbound: {e}")
+        return
     ni_id=db.add_node_inbound(node_id,inbound_id,opts.get("name"),multiplier)
     mult_str=f" ×{multiplier:g}" if multiplier!=1.0 else ""
     label=opts.get("name") or f"Inbound {inbound_id}"
@@ -553,6 +563,54 @@ async def cmd_regen(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     qr_buf = _make_qr_bytes(new_link)
     await update.message.reply_photo(photo=qr_buf, caption=f"QR: {sub.get('comment') or new_id}")
 
+async def cmd_reguuid(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Usage: /reguuid <id or comment>")
+        return
+    identifier=" ".join(ctx.args)
+    sub=db.get_sub(identifier) or db.get_sub_by_comment(identifier)
+    if not sub:
+        await update.message.reply_text("Subscription not found.")
+        return
+    new_uuid=str(uuid.uuid4())
+    errors=[]
+    for sn in db.get_sub_nodes(sub["id"]):
+        try:
+            xui=XUIClient(sn["address"],sn["username"],sn["password"],sn.get("proxy_url"))
+            ok=xui.rotate_client_uuid(sn["inbound_id"],sn["client_uuid"],sn["email"],new_uuid)
+            if ok:
+                db.update_sub_node_uuid(sub["id"],sn["node_id"],new_uuid)
+            else:
+                errors.append(f"node {sn['node_id']}: failed")
+        except Exception as e:
+            errors.append(f"node {sn['node_id']}: {e}")
+    msg=f"UUID Regenerated\n\n<tg-spoiler>{_html.escape(new_uuid)}</tg-spoiler>"
+    if errors:
+        msg+=f"\n\nErrors: {_html.escape(', '.join(errors))}"
+    await update.message.reply_text(msg,parse_mode="HTML")
+
+async def cmd_resettraffic(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_admin(update.effective_user.id):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Usage: /resettraffic <id or comment>")
+        return
+    identifier=" ".join(ctx.args)
+    sub=db.get_sub(identifier) or db.get_sub_by_comment(identifier)
+    if not sub:
+        await update.message.reply_text("Subscription not found.")
+        return
+    for sn in db.get_sub_nodes(sub["id"]):
+        try:
+            xui=XUIClient(sn["address"],sn["username"],sn["password"],sn.get("proxy_url"))
+            xui.reset_client_traffic(sn["inbound_id"],sn["email"])
+        except Exception:
+            pass
+    db.reset_sub_traffic(sub["id"])
+    await update.message.reply_text(f"Traffic reset: {_html.escape(sub.get('comment') or sub['id'])}",parse_mode="HTML")
+
 async def cmd_configs(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update.effective_user.id):
         return
@@ -602,6 +660,8 @@ async def _post_init(app):
         ("list", "List subscriptions (10/page)"),
         ("edit", "Edit subscription"),
         ("regen", "Regenerate subscription nanoid"),
+        ("reguuid", "Regenerate VLESS/VMess UUID"),
+        ("resettraffic", "Reset traffic counters"),
         ("configs", "Show per-node config URLs for a subscription"),
         ("nodes", "List nodes"),
         ("addnode", "Add a node"),
@@ -633,6 +693,8 @@ def _build_app():
     application.add_handler(CommandHandler("list", cmd_list))
     application.add_handler(CommandHandler("edit", cmd_edit))
     application.add_handler(CommandHandler("regen", cmd_regen))
+    application.add_handler(CommandHandler("reguuid", cmd_reguuid))
+    application.add_handler(CommandHandler("resettraffic", cmd_resettraffic))
     application.add_handler(CommandHandler("configs", cmd_configs))
     application.add_handler(CommandHandler("nodes", cmd_nodes))
     application.add_handler(CommandHandler("addnode", cmd_addnode))

@@ -281,6 +281,17 @@ def cmd_addsubnode(args):
     if not node:
         console.print(f"[{DANGER}]Node not found: {node_id}[/]")
         return
+    from xui_client import XUIClient
+    try:
+        xui = XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
+        inbound = xui.get_inbound(inbound_id)
+        proto = (inbound.get("protocol") or "").lower() if inbound else ""
+        if proto not in ("vless", "vmess"):
+            console.print(f"[{DANGER}]Unsupported protocol '{proto}': only vless and vmess are supported.[/]")
+            return
+    except Exception as e:
+        console.print(f"[{DANGER}]Failed to verify inbound: {e}[/]")
+        return
     ni_id = db.add_node_inbound(node_id, inbound_id, opts.get("name"), multiplier)
     label = opts.get("name") or f"Inbound {inbound_id}"
     mult_str = f" [{WARN}]×{multiplier:g}[/]" if multiplier != 1.0 else ""
@@ -599,6 +610,49 @@ def cmd_regen(args):
     sub_url = f"{base_url}/sub/{new_id}" if base_url else f"/sub/{new_id}"
     console.print(Panel(f"  [{MUTED}]New ID[/]  [{ACC}]{new_id}[/]\n  [{MUTED}]URL[/]     [{BLUE}]{sub_url}[/]", title=f"[bold {ACC}]Regenerated: {sub.get('comment') or sub['id']}[/]", border_style=ACC, padding=(0, 1)))
 
+def cmd_regen_uuid(args):
+    from xui_client import XUIClient
+    if not args:
+        console.print(f"[{DANGER}]Usage: ghostgate regen-uuid <id or comment>[/]")
+        return
+    sub = db.get_sub(args[0]) or db.get_sub_by_comment(args[0])
+    if not sub:
+        console.print(f"[{DANGER}]Not found: {args[0]}[/]")
+        return
+    new_uuid = str(uuid.uuid4())
+    errors = []
+    for sn in db.get_sub_nodes(sub["id"]):
+        try:
+            xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+            ok = xui.rotate_client_uuid(sn["inbound_id"], sn["client_uuid"], sn["email"], new_uuid)
+            if ok:
+                db.update_sub_node_uuid(sub["id"], sn["node_id"], new_uuid)
+            else:
+                errors.append(f"node {sn['node_id']}: failed")
+        except Exception as e:
+            errors.append(f"node {sn['node_id']}: {e}")
+    if errors:
+        console.print(f"[{WARN}]Errors: {', '.join(errors)}[/]")
+    console.print(f"[{ACC}]UUID regenerated:[/] [{MUTED}]{new_uuid}[/]  [{MUTED}]Sub: {sub.get('comment') or sub['id']}[/]")
+
+def cmd_reset_traffic(args):
+    from xui_client import XUIClient
+    if not args:
+        console.print(f"[{DANGER}]Usage: ghostgate reset-traffic <id or comment>[/]")
+        return
+    sub = db.get_sub(args[0]) or db.get_sub_by_comment(args[0])
+    if not sub:
+        console.print(f"[{DANGER}]Not found: {args[0]}[/]")
+        return
+    for sn in db.get_sub_nodes(sub["id"]):
+        try:
+            xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+            xui.reset_client_traffic(sn["inbound_id"], sn["email"])
+        except Exception:
+            pass
+    db.reset_sub_traffic(sub["id"])
+    console.print(f"[{ACC}]Traffic reset:[/] [{MUTED}]{sub.get('comment') or sub['id']}[/]")
+
 def cmd_update(args):
     console.print(f"[{MUTED}]Current version:[/] [{ACC}]v{updater.VERSION}[/]")
     console.print(f"[{MUTED}]Checking for updates...[/]")
@@ -628,6 +682,8 @@ def cmd_help(args):
         f"  [{ACC}]create[/] [{MUTED}][--id X] --comment X [--note X] [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--ip N] [--nodes 1,2|all|none][/]",
         f"  [{ACC}]edit[/] [{MUTED}]<id|comment> [--data GB] [--days N] [--firstuse-days N] [--firstuse-seconds N] [--no-firstuse] [--remove-data GB] [--remove-days N] [--no-expire] [--comment X] [--note X] [--ip N] [--enable] [--disable][/]",
         f"  [{ACC}]regen[/] [{MUTED}]<id|comment>[/]                         Regenerate subscription nanoid",
+        f"  [{ACC}]regen-uuid[/] [{MUTED}]<id|comment>[/]                    Regenerate VLESS/VMess UUID for a subscription",
+        f"  [{ACC}]reset-traffic[/] [{MUTED}]<id|comment>[/]                 Reset traffic counters for a subscription",
         f"  [{ACC}]delete[/] [{MUTED}]<id|comment>[/]                         Delete subscription",
         f"  [{ACC}]nodes[/]                                       List nodes",
         f"  [{ACC}]addnode[/] [{MUTED}]--name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...] [--multiplier N][/]",
@@ -678,6 +734,8 @@ _COMMANDS = {
     "delete": cmd_delete,
     "edit": cmd_edit,
     "regen": cmd_regen,
+    "regen-uuid": cmd_regen_uuid,
+    "reset-traffic": cmd_reset_traffic,
     "configs": cmd_configs,
     "addsubnode": cmd_addsubnode,
     "editsubnode": cmd_editsubnode,

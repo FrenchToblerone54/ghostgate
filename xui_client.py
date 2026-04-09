@@ -95,6 +95,19 @@ class XUIClient:
         client["subId"] = new_sub_id
         return self.update_client(inbound_id, client_uuid, client)
 
+    def rotate_client_uuid(self, inbound_id, old_uuid, email, new_uuid, enabled=None):
+        client = self.get_client_by_email(inbound_id, email)
+        if not client:
+            return False
+        client["id"] = new_uuid
+        if enabled is not None:
+            client["enable"] = enabled
+        return self.update_client(inbound_id, old_uuid, client)
+
+    def reset_client_traffic(self, inbound_id, email):
+        r = self.session.post(f"{self.base}/panel/api/inbounds/{inbound_id}/resetClientTraffic/{email}", timeout=10)
+        return r.json().get("success", False)
+
     def test_connection(self):
         try:
             self._login()

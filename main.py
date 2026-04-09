@@ -60,7 +60,7 @@ def _migrate(old_db_path, node_id):
     conn.close()
     print(f"Migrated {count}/{len(configs)} subscriptions from {old_db_path}")
 
-_CLI_COMMANDS = {"list", "stats", "nodes", "subnodes", "listsubnode", "addsubnode", "editsubnode", "delsubnode", "status", "create", "delete", "edit", "update", "help", "configs", "addnode", "delnode", "editnode", "bot", "regen"}
+_CLI_COMMANDS = {"list", "stats", "nodes", "subnodes", "listsubnode", "addsubnode", "editsubnode", "delsubnode", "status", "create", "delete", "edit", "update", "help", "configs", "addnode", "delnode", "editnode", "bot", "regen", "regen-uuid", "reset-traffic"}
 
 def main():
     cli_args = [a for a in sys.argv[1:] if not a.startswith("--")]

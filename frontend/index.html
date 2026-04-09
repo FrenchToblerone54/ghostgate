@@ -518,7 +518,7 @@ Refresh
 <div class="fg" id="mc-firstuse-days" style="display:none"><label class="fl">First-use expiry (days)</label><input class="fi" type="number" value="30" min="1"></div>
 <div class="fg"><label class="fl">IP Limit (0=∞)</label><input class="fi" id="mc-ip" type="number" value="0" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="mc-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
-<div class="fg"><label class="fl">Nodes</label><div class="nodes-list" id="mc-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading nodes...</div></div></div>
+<div class="fg"><label class="fl" style="display:flex;justify-content:space-between;align-items:center">Nodes<span style="display:flex;gap:4px"><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selAll('mc-nodes')">All</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selNone('mc-nodes')">None</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_savePreset('mc-nodes')">+ Preset</button></span></label><div id="mc-nodes-preset-bar" style="display:flex;gap:4px;flex-wrap:wrap;min-height:0;margin-bottom:2px"></div><div class="nodes-list" id="mc-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading nodes...</div></div></div>
 </div>
 <div class="modal-ft">
 <button class="btn btn-ghost" onclick="closeM('m-create')">Cancel</button>
@@ -545,7 +545,7 @@ Refresh
 <div style="display:flex;gap:8px"><button id="me-no-expire-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoExpire()">Set No Expiry</button><button id="me-no-limit-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoDataLimit()">Set No Data Limit</button></div>
 <div class="fg"><label class="fl">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="me-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
-<div class="fg"><label class="fl">Node Order</label><div id="me-node-order"></div><label class="fl" style="margin-top:6px">Add / Remove Nodes</label><div class="nodes-list" id="me-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading...</div></div></div>
+<div class="fg"><label class="fl">Node Order</label><div id="me-node-order"></div><label class="fl" style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">Add / Remove Nodes<span style="display:flex;gap:4px"><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selAll('me-nodes')">All</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selNone('me-nodes')">None</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_savePreset('me-nodes')">+ Preset</button></span></label><div id="me-nodes-preset-bar" style="display:flex;gap:4px;flex-wrap:wrap;min-height:0;margin-bottom:2px"></div><div class="nodes-list" id="me-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading...</div></div></div>
 </div>
 <div class="modal-ft">
 <button class="btn btn-ghost" onclick="closeM('m-edit')">Cancel</button>
@@ -565,6 +565,8 @@ Refresh
 </div>
 <div class="modal-ft">
 <button class="btn btn-ghost" id="md-regen-btn" onclick="regenSubId()">Regen ID</button>
+<button class="btn btn-ghost" id="md-regen-uuid-btn" onclick="regenSubUuid()">Regen UUID</button>
+<button class="btn btn-ghost" id="md-reset-traffic-btn" onclick="resetSubTraffic()">Reset Traffic</button>
 <button class="btn btn-ghost" onclick="openConfigs()">Node Configs</button>
 </div>
 </div>
@@ -830,7 +832,8 @@ async function openCreate(){
   document.getElementById("mc-tags").value="";
   document.getElementById("mc-sm").value="1";
   const [nodes,allTags]=await Promise.all([fetch(API+"/api/nodes").then(r=>r.json()),fetch(API+"/api/tags").then(r=>r.json())]);
-  document.getElementById("mc-nodes").innerHTML=_renderInboundSelector(nodes,new Set());
+  document.getElementById("mc-nodes").innerHTML=_renderInboundSelector(nodes,new Set(),"mc-nodes");
+  _renderPresets("mc-nodes");
   _refreshTagFilter(allTags);
   document.getElementById("m-create").classList.add("open");
 }
@@ -914,6 +917,68 @@ async function regenSubId(){
   btn.disabled=false; btn.textContent="Regen ID";
 }
 
+async function regenSubUuid(){
+  if(!confirm("Regenerate VLESS/VMess UUID? Users will need to re-download their subscription link.")) return;
+  const btn=document.getElementById("md-regen-uuid-btn");
+  btn.disabled=true; btn.textContent="Regen...";
+  const r=await fetch(API+"/api/subscriptions/"+detailSubId+"/regen-uuid",{method:"POST"}).then(x=>x.json());
+  btn.disabled=false; btn.textContent="Regen UUID";
+  if(r.errors&&r.errors.length) alert("Done (with errors): "+r.errors.join("; "));
+}
+
+async function resetSubTraffic(){
+  if(!confirm("Reset traffic counters for this subscription? Usage will be zeroed in all 3x-ui nodes.")) return;
+  const btn=document.getElementById("md-reset-traffic-btn");
+  btn.disabled=true; btn.textContent="Resetting...";
+  await fetch(API+"/api/subscriptions/"+detailSubId+"/reset-traffic",{method:"POST"});
+  btn.disabled=false; btn.textContent="Reset Traffic";
+  loadSubs();
+}
+
+let _ggPresets=JSON.parse(localStorage.getItem("gg_presets")||"{}");
+function _selAll(cid){document.querySelectorAll("#"+cid+" input[type=checkbox]").forEach(i=>i.checked=true);}
+function _selNone(cid){document.querySelectorAll("#"+cid+" input[type=checkbox]").forEach(i=>i.checked=false);}
+function _selNode(cid,nodeId,val){const g=document.querySelector("#"+cid+" .node-group[data-node-id='"+nodeId+"']");if(g)g.querySelectorAll("input[type=checkbox]").forEach(i=>i.checked=val);}
+function _savePreset(cid){
+  const name=(prompt("Preset name:")||"").trim();
+  if(!name) return;
+  _ggPresets[name]=[...document.querySelectorAll("#"+cid+" input:checked")].map(i=>parseInt(i.value));
+  localStorage.setItem("gg_presets",JSON.stringify(_ggPresets));
+  _renderPresets("mc-nodes");
+  _renderPresets("me-nodes");
+}
+function _delPreset(name){
+  delete _ggPresets[name];
+  localStorage.setItem("gg_presets",JSON.stringify(_ggPresets));
+  _renderPresets("mc-nodes");
+  _renderPresets("me-nodes");
+}
+function _loadPreset(cid,name){
+  const ids=new Set(_ggPresets[name]||[]);
+  document.querySelectorAll("#"+cid+" input[type=checkbox]").forEach(i=>i.checked=ids.has(parseInt(i.value)));
+}
+function _renderPresets(cid){
+  const bar=document.getElementById(cid+"-preset-bar");
+  if(!bar) return;
+  bar.innerHTML="";
+  if(!Object.keys(_ggPresets).length) return;
+  const frag=document.createDocumentFragment();
+  Object.entries(_ggPresets).forEach(([name,ids])=>{
+    const sp=document.createElement("span");
+    sp.className="badge badge-blue";
+    sp.style.cssText="cursor:pointer;padding:2px 7px;gap:4px";
+    sp.textContent=name;
+    const x=document.createElement("span");
+    x.textContent="×";
+    x.style.cssText="opacity:0.5;margin-left:4px;cursor:pointer";
+    x.addEventListener("click",e=>{e.stopPropagation();_delPreset(name);});
+    sp.appendChild(x);
+    sp.addEventListener("click",()=>_loadPreset(cid,name));
+    frag.appendChild(sp);
+  });
+  bar.appendChild(frag);
+}
+
 async function openConfigs(){
   const body=document.getElementById("mc-configs-body");
   body.innerHTML="<div style='color:var(--text2)'>Loading...</div>";
@@ -945,7 +1010,8 @@ async function editSub(id){
   editingOrigNodes=new Set(assignedIds);
   document.getElementById("me-node-order").innerHTML=_renderNodeOrderList(sub.nodes||[]);
   _initNodeOrderDrag();
-  document.getElementById("me-nodes").innerHTML=_renderInboundSelector(nodes,assignedIds);
+  document.getElementById("me-nodes").innerHTML=_renderInboundSelector(nodes,assignedIds,"me-nodes");
+  _renderPresets("me-nodes");
   document.getElementById("m-edit").classList.add("open");
 }
 
@@ -1110,10 +1176,10 @@ async function deleteSub(id){
   loadSubs(); showAlert("s-alert","Deleted","ok");
 }
 
-function _renderInboundSelector(nodes, checkedIds){
+function _renderInboundSelector(nodes, checkedIds, cid){
   const filtered=nodes.filter(n=>(n.inbounds||[]).length>0);
   if(filtered.length===0) return '<div style="color:var(--text2);font-size:0.84em;padding:8px">No sub-nodes configured. Add nodes and sub-nodes in the Nodes section first.</div>';
-  return filtered.map(n=>`<div class="node-group"><div class="node-group-label">${n.name}</div>${(n.inbounds||[]).map(ni=>`<label class="node-item"><input type="checkbox" value="${ni.id}" ${checkedIds.has(ni.id)?"checked":""}><div><div class="node-item-name">${ni.name||"Inbound "+ni.inbound_id}</div><div class="node-item-addr">ID: ${ni.inbound_id}</div></div></label>`).join("")}</div>`).join("");
+  return filtered.map(n=>`<div class="node-group" data-node-id="${n.id}"><div class="node-group-label" style="display:flex;justify-content:space-between;align-items:center">${n.name}<span style="display:flex;gap:3px;flex-shrink:0"><button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:0.7em" onclick="_selNode('${cid||""}',${n.id},true)">All</button><button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:0.7em" onclick="_selNode('${cid||""}',${n.id},false)">None</button></span></div>${(n.inbounds||[]).map(ni=>`<label class="node-item"><input type="checkbox" value="${ni.id}" ${checkedIds.has(ni.id)?"checked":""}><div><div class="node-item-name">${ni.name||"Inbound "+ni.inbound_id}</div><div class="node-item-addr">ID: ${ni.inbound_id}</div></div></label>`).join("")}</div>`).join("");
 }
 
 function _renderNodeOrderList(assignedNodes){
