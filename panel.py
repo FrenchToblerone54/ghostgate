@@ -327,12 +327,20 @@ def _disable_node_clients(node_id):
     node = db.get_node(node_id)
     if not node:
         return
+    try:
+        XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
+    except Exception:
+        return
     for ni in db.get_node_inbounds(node_id):
         _disable_subnode_clients(ni["id"])
 
 def _enable_node_clients(node_id):
     node = db.get_node(node_id)
     if not node:
+        return
+    try:
+        XUIClient(node["address"], node["username"], node["password"], node.get("proxy_url"))
+    except Exception:
         return
     for ni in db.get_node_inbounds(node_id):
         if ni.get("enabled"):
@@ -959,8 +967,11 @@ def register_routes(panel_path):
     def api_node_delete(node_id):
         snodes = db.get_sub_nodes_for_node(node_id)
         _xui = {}
+        _xui_failed = set()
         for sn in snodes:
             key = (sn["address"], sn["username"])
+            if key in _xui_failed:
+                continue
             try:
                 if key not in _xui:
                     _xui[key] = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
@@ -970,7 +981,7 @@ def register_routes(panel_path):
                     effective = (sn.get("traffic_offset") or 0.0) + max(0, raw - (sn.get("traffic_baseline") or 0)) * (sn.get("traffic_multiplier") or 1.0)
                     db.add_sub_preserved_traffic(sn["sub_id"], effective)
             except Exception:
-                pass
+                _xui_failed.add(key)
         db.delete_node(node_id)
         return jsonify({"ok": True})
 
