@@ -274,9 +274,12 @@ def _disable_subnode_clients(ni_id):
     ni = db.get_node_inbound_with_node(ni_id)
     if not ni:
         return
+    try:
+        xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+    except Exception:
+        return
     for sn in db.get_sub_nodes_for_inbound(ni_id):
         try:
-            xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
             xui.delete_client(ni["inbound_id"], sn["client_uuid"])
         except Exception:
             pass
@@ -285,12 +288,15 @@ def _enable_subnode_clients(ni_id):
     ni = db.get_node_inbound_with_node(ni_id)
     if not ni:
         return
+    try:
+        xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+    except Exception:
+        return
     for sn in db.get_sub_nodes_for_inbound(ni_id):
         try:
             sub = db.get_sub(sn["sub_id"])
             if not sub:
                 continue
-            xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
             data_gb = sub.get("data_gb") or 0
             used_bytes = sub.get("used_bytes") or 0
             mult = ni.get("traffic_multiplier") or 1.0
@@ -955,9 +961,9 @@ def register_routes(panel_path):
         _xui = {}
         for sn in snodes:
             key = (sn["address"], sn["username"])
-            if key not in _xui:
-                _xui[key] = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
             try:
+                if key not in _xui:
+                    _xui[key] = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
                 t = _xui[key].get_client_traffic(sn["email"])
                 if t:
                     raw = (t.get("up") or 0) + (t.get("down") or 0)

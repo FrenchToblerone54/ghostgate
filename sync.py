@@ -15,6 +15,7 @@ def _sync_once():
     for sn in all_snodes:
         nodes_by_sub.setdefault(sn["sub_id"], []).append(sn)
     _xui_sessions = {}
+    _xui_failed = set()
     for sub in subs:
         sid = sub["id"]
         snodes = nodes_by_sub.get(sid, [])
@@ -24,8 +25,10 @@ def _sync_once():
         node_bytes = {}
         total_effective = 0
         for sn in snodes:
+            key = (sn["address"], sn["username"])
+            if key in _xui_failed:
+                continue
             try:
-                key = (sn["address"], sn["username"])
                 if key not in _xui_sessions:
                     _xui_sessions[key] = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
                 xui = _xui_sessions[key]
@@ -39,6 +42,7 @@ def _sync_once():
                     adjusted_raw = max(0, raw - baseline)
                     total_effective += offset + adjusted_raw * (sn.get("traffic_multiplier") or 1.0)
             except Exception as e:
+                _xui_failed.add(key)
                 logger.warning(f"sync error node {sn['node_id']} sub {sid}: {e}")
         total_effective += float(sub.get("traffic_preserved") or 0)
         total_effective = int(total_effective)
@@ -94,6 +98,8 @@ def _sync_once():
 
 def _sync_first_use_expiry():
     subs = db.get_subs_pending_first_use_expiry()
+    _xui_sessions = {}
+    _xui_failed = set()
     for sub in subs:
         sid = sub["id"]
         seconds = sub.get("expire_after_first_use_seconds", 0)
@@ -103,8 +109,13 @@ def _sync_first_use_expiry():
         earliest_expiry_ms = None
         has_any_expiry = False
         for sn in snodes:
+            key = (sn["address"], sn["username"])
+            if key in _xui_failed:
+                continue
             try:
-                xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                if key not in _xui_sessions:
+                    _xui_sessions[key] = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                xui = _xui_sessions[key]
                 client = xui.get_client_by_email(sn["inbound_id"], sn["email"])
                 if client:
                     expiry_ms = client.get("expiryTime", 0)
@@ -114,16 +125,22 @@ def _sync_first_use_expiry():
                         if earliest_expiry_ms is None or expiry_ms < earliest_expiry_ms:
                             earliest_expiry_ms = expiry_ms
             except Exception as e:
+                _xui_failed.add(key)
                 logger.warning(f"first-use expiry check error node {sn['node_id']} sub {sid}: {e}")
         if not has_any_expiry:
             expire_ms = -seconds * 1000
             ip_limit = sub.get("ip_limit", 0)
             for sn in snodes:
+                key = (sn["address"], sn["username"])
+                if key in _xui_failed:
+                    continue
                 try:
-                    xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
-                    xui.update_client_expiry_ip(sn["inbound_id"], sn["client_uuid"], sn["email"], expire_ms, ip_limit)
+                    if key not in _xui_sessions:
+                        _xui_sessions[key] = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                    _xui_sessions[key].update_client_expiry_ip(sn["inbound_id"], sn["client_uuid"], sn["email"], expire_ms, ip_limit)
                     logger.info(f"Set initial negative expiry on node {sn['node_id']} for sub {sid}: {expire_ms}")
                 except Exception as e:
+                    _xui_failed.add(key)
                     logger.warning(f"set initial expiry error node {sn['node_id']} sub {sid}: {e}")
         elif earliest_expiry_ms:
             expire_at = datetime.fromtimestamp(earliest_expiry_ms / 1000, tz=timezone.utc).isoformat()
@@ -132,10 +149,15 @@ def _sync_first_use_expiry():
             expire_ms = int(earliest_expiry_ms)
             ip_limit = sub.get("ip_limit", 0)
             for sn in snodes:
+                key = (sn["address"], sn["username"])
+                if key in _xui_failed:
+                    continue
                 try:
-                    xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
-                    xui.update_client_expiry_ip(sn["inbound_id"], sn["client_uuid"], sn["email"], expire_ms, ip_limit)
+                    if key not in _xui_sessions:
+                        _xui_sessions[key] = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                    _xui_sessions[key].update_client_expiry_ip(sn["inbound_id"], sn["client_uuid"], sn["email"], expire_ms, ip_limit)
                 except Exception as e:
+                    _xui_failed.add(key)
                     logger.warning(f"sync expiry to node {sn['node_id']} sub {sid}: {e}")
 
 def start_sync(interval=20):
