@@ -8,6 +8,10 @@ from xui_client import XUIClient
 
 logger = logging.getLogger("sync")
 
+def _tmult(sn):
+    v = sn.get("traffic_multiplier")
+    return 1.0 if v is None else float(v)
+
 def _sync_once():
     subs, _ = db.get_subs(page=1, per_page=100000)
     all_snodes = db.get_all_sub_nodes()
@@ -40,7 +44,7 @@ def _sync_once():
                     offset = sn.get("traffic_offset") or 0.0
                     baseline = sn.get("traffic_baseline") or 0
                     adjusted_raw = max(0, raw - baseline)
-                    total_effective += offset + adjusted_raw * (sn.get("traffic_multiplier") or 1.0)
+                    total_effective += offset + adjusted_raw * _tmult(sn)
             except Exception as e:
                 _xui_failed.add(key)
                 logger.warning(f"sync error node {sn['node_id']} sub {sid}: {e}")
@@ -89,8 +93,8 @@ def _sync_once():
                     except Exception as e:
                         logger.warning(f"re-enable error node {sn['node_id']} sub {sid}: {e}")
                 if limit_bytes > 0 and traffic_changed:
-                    mult = sn.get("traffic_multiplier") or 1.0
-                    node_limit = int(node_bytes.get(sn["node_id"], 0) + remaining / mult)
+                    mult = _tmult(sn)
+                    node_limit = int(node_bytes.get(sn["node_id"], 0) + remaining / mult) if mult > 0 else 0
                     try:
                         xui.update_client_limit(sn["inbound_id"], sn["client_uuid"], sn["email"], node_limit)
                     except Exception as e:

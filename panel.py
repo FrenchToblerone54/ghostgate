@@ -21,6 +21,15 @@ from xui_client import XUIClient
 app = Flask(__name__)
 BASE_URL = ""
 
+def _tmult(ni):
+    v = ni.get("traffic_multiplier")
+    return 1.0 if v is None else float(v)
+
+def _tlimit(data_gb, used_bytes, mult):
+    if data_gb <= 0 or mult == 0:
+        return 0
+    return int(max(0, data_gb * 1073741824 - used_bytes) / mult)
+
 def _sys_info():
     cpu = psutil.cpu_percent(interval=0.1)
     ram = psutil.virtual_memory()
@@ -299,9 +308,9 @@ def _enable_subnode_clients(ni_id):
                 continue
             data_gb = sub.get("data_gb") or 0
             used_bytes = sub.get("used_bytes") or 0
-            mult = ni.get("traffic_multiplier") or 1.0
+            mult = _tmult(ni)
             remaining = max(0, data_gb * 1073741824 - used_bytes)
-            total_limit = int(remaining / mult) if data_gb > 0 else 0
+            total_limit = _tlimit(data_gb, used_bytes, mult)
             expire_ms = 0
             if sub.get("expire_at"):
                 try:
@@ -472,7 +481,7 @@ def register_routes(panel_path):
                 continue
             try:
                 xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
-                total_limit_bytes = int(max(0, data_gb * 1073741824 - (sub.get("used_bytes") or 0)) / (ni.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
+                total_limit_bytes = _tlimit(data_gb, sub.get("used_bytes") or 0, _tmult(ni))
                 email = f"{sub_id}-{node_id}"
                 expiry_time = -expire_after_first_use_seconds*1000 if expire_after_first_use_seconds>0 else expire_ms
                 client = xui.make_client(email, client_uuid, expiry_time, ip_limit, sub_id, comment or "", total_limit_bytes)
@@ -562,9 +571,9 @@ def register_routes(panel_path):
                     if new_limit_bytes > 0:
                         t = xui.get_client_traffic(sn["email"])
                         raw = ((t.get("up") or 0) + (t.get("down") or 0)) if t else 0
-                        mult = sn.get("traffic_multiplier") or 1.0
+                        mult = _tmult(sn)
                         remaining = max(0, new_limit_bytes - used_bytes)
-                        xui.update_client_limit(sn["inbound_id"], sn["client_uuid"], sn["email"], int(raw + remaining/mult))
+                        xui.update_client_limit(sn["inbound_id"], sn["client_uuid"], sn["email"], int(raw + remaining/mult) if mult > 0 else 0)
                     else:
                         xui.update_client_limit(sn["inbound_id"], sn["client_uuid"], sn["email"], 0)
                     if not is_now_over and not is_expired and sub.get("enabled") != 0 and sn.get("client_disabled"):
@@ -611,7 +620,7 @@ def register_routes(panel_path):
             try:
                 client_uuid = str(uuid.uuid4())
                 xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
-                total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (ni.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
+                total_limit_bytes = _tlimit(sub["data_gb"], sub.get("used_bytes") or 0, _tmult(ni))
                 email = f"{sub_id}-{node_id}"
                 client = xui.make_client(email, client_uuid, expiry_time, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
                 now = datetime.now(timezone.utc)
@@ -647,7 +656,7 @@ def register_routes(panel_path):
                 t = xui.get_client_traffic(sn["email"])
                 if t:
                     raw = (t.get("up") or 0) + (t.get("down") or 0)
-                    effective = (sn.get("traffic_offset") or 0.0) + max(0, raw - (sn.get("traffic_baseline") or 0)) * (sn.get("traffic_multiplier") or 1.0)
+                    effective = (sn.get("traffic_offset") or 0.0) + max(0, raw - (sn.get("traffic_baseline") or 0)) * _tmult(sn)
                     db.add_sub_preserved_traffic(sub_id, effective)
                 xui.delete_client(sn["inbound_id"], sn["client_uuid"])
             except Exception:
@@ -685,7 +694,7 @@ def register_routes(panel_path):
                     try:
                         client_uuid = str(uuid.uuid4())
                         xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
-                        total_limit_bytes = int(max(0, sub["data_gb"] * 1073741824 - (sub.get("used_bytes") or 0)) / (ni.get("traffic_multiplier") or 1.0)) if sub["data_gb"] > 0 else 0
+                        total_limit_bytes = _tlimit(sub["data_gb"], sub.get("used_bytes") or 0, _tmult(ni))
                         email = f"{sub_id}-{node_id}"
                         client = xui.make_client(email, client_uuid, expiry_time, sub.get("ip_limit", 0), sub_id, sub.get("comment") or "", total_limit_bytes)
                         now = datetime.now(timezone.utc)
@@ -714,7 +723,7 @@ def register_routes(panel_path):
                         t = xui.get_client_traffic(sn["email"])
                         if t:
                             raw = (t.get("up") or 0) + (t.get("down") or 0)
-                            effective = (sn.get("traffic_offset") or 0.0) + max(0, raw - (sn.get("traffic_baseline") or 0)) * (sn.get("traffic_multiplier") or 1.0)
+                            effective = (sn.get("traffic_offset") or 0.0) + max(0, raw - (sn.get("traffic_baseline") or 0)) * _tmult(sn)
                             db.add_sub_preserved_traffic(sub_id, effective)
                         xui.delete_client(sn["inbound_id"], sn["client_uuid"])
                     except Exception:
@@ -881,6 +890,33 @@ def register_routes(panel_path):
                 errors.append(f"node {sn['node_id']}: {e}")
         return jsonify({"ok": True, "uuid": new_uuid, "errors": errors})
 
+    @app.route(f"/{panel_path}/api/bulk/reset-traffic", methods=["POST"])
+    def api_bulk_reset_traffic():
+        sub_ids = request.json.get("sub_ids", [])
+        for sub_id in sub_ids:
+            sub = db.get_sub(sub_id)
+            if not sub:
+                continue
+            snodes = db.get_sub_nodes(sub_id)
+            for sn in snodes:
+                try:
+                    xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                    xui.reset_client_traffic(sn["inbound_id"], sn["email"])
+                except Exception:
+                    pass
+            db.reset_sub_traffic(sub_id)
+            now_dt = datetime.now(timezone.utc)
+            is_expired = bool(sub.get("expire_at")) and datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc) < now_dt
+            if sub.get("enabled") != 0 and not is_expired:
+                for sn in snodes:
+                    try:
+                        xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                        xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], True)
+                    except Exception:
+                        pass
+                db.reset_sub_node_disabled(sub_id)
+        return jsonify({"ok": True, "count": len(sub_ids)})
+
     @app.route(f"/{panel_path}/api/subscriptions/<sub_id>/reset-traffic", methods=["POST"])
     def api_sub_reset_traffic(sub_id):
         sub = db.get_sub(sub_id)
@@ -978,7 +1014,7 @@ def register_routes(panel_path):
                 t = _xui[key].get_client_traffic(sn["email"])
                 if t:
                     raw = (t.get("up") or 0) + (t.get("down") or 0)
-                    effective = (sn.get("traffic_offset") or 0.0) + max(0, raw - (sn.get("traffic_baseline") or 0)) * (sn.get("traffic_multiplier") or 1.0)
+                    effective = (sn.get("traffic_offset") or 0.0) + max(0, raw - (sn.get("traffic_baseline") or 0)) * _tmult(sn)
                     db.add_sub_preserved_traffic(sn["sub_id"], effective)
             except Exception:
                 _xui_failed.add(key)
@@ -1009,7 +1045,10 @@ def register_routes(panel_path):
                 return jsonify({"error": f"unsupported protocol '{proto}': only vless and vmess are supported"}), 400
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-        ni_id = db.add_node_inbound(node_id, int(data["inbound_id"]), data.get("name"), float(data.get("traffic_multiplier", 1.0)))
+        try:
+            ni_id = db.add_node_inbound(node_id, int(data["inbound_id"]), data.get("name"), float(data.get("traffic_multiplier", 1.0)))
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 409
         return jsonify({"id": ni_id})
 
     @app.route(f"/{panel_path}/api/nodes/<int:node_id>/inbounds/<int:ni_id>", methods=["PUT"])
@@ -1017,7 +1056,7 @@ def register_routes(panel_path):
         data = request.json
         old_ni = db.get_node_inbound(ni_id)
         old_enabled = old_ni.get("enabled", 1) if old_ni else 1
-        old_mult = float(old_ni.get("traffic_multiplier") or 1.0) if old_ni else 1.0
+        old_mult = _tmult(old_ni) if old_ni else 1.0
         old_inbound_id = old_ni.get("inbound_id") if old_ni else None
         db.update_node_inbound(ni_id, **data)
         if "enabled" in data:
@@ -1057,9 +1096,8 @@ def register_routes(panel_path):
                         xui.delete_client(old_inbound_id, sn["client_uuid"])
                         data_gb = sub.get("data_gb") or 0
                         used_bytes = sub.get("used_bytes") or 0
-                        mult = float(ni_with_node.get("traffic_multiplier") or 1.0)
-                        remaining = max(0, data_gb*1073741824 - used_bytes)
-                        total_limit = int(remaining/mult) if data_gb > 0 else 0
+                        mult = _tmult(ni_with_node)
+                        total_limit = _tlimit(data_gb, used_bytes, mult)
                         expire_ms = 0
                         if sub.get("expire_at"):
                             expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp()*1000)

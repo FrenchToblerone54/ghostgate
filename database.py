@@ -255,10 +255,12 @@ def delete_node(node_id):
 
 def add_node_inbound(node_id, inbound_id, name=None, traffic_multiplier=1.0):
     with _conn() as c:
+        if c.execute("SELECT 1 FROM node_inbounds WHERE node_id=? AND inbound_id=?", (node_id, inbound_id)).fetchone():
+            raise ValueError(f"inbound_id {inbound_id} already exists on this node")
         cnt = c.execute("SELECT COUNT(*) FROM node_inbounds WHERE node_id=?", (node_id,)).fetchone()[0]
         cur = c.execute(
             'INSERT INTO node_inbounds (node_id, inbound_id, name, traffic_multiplier, "order") VALUES (?,?,?,?,?)',
-            (node_id, inbound_id, name, max(1.0, float(traffic_multiplier)), cnt)
+            (node_id, inbound_id, name, max(0.0, float(traffic_multiplier)), cnt)
         )
         return cur.lastrowid
 
