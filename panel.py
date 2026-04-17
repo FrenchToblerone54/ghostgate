@@ -9,7 +9,7 @@ import threading
 import subprocess
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
-from flask import Flask, jsonify, request, Response, render_template_string, abort
+from flask import Flask, jsonify, request, Response, render_template_string, abort, send_from_directory
 from nanoid import generate
 import psutil
 import qrcode
@@ -20,6 +20,10 @@ from xui_client import XUIClient
 
 app = Flask(__name__)
 BASE_URL = ""
+
+@app.route("/external/<path:filename>")
+def external_static(filename):
+    return send_from_directory(os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "external"), filename)
 
 def _tmult(ni):
     v = ni.get("traffic_multiplier")
