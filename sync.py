@@ -59,24 +59,7 @@ def _sync_once():
         is_expired = bool(sub.get("expire_at")) and datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc) < now
         is_over_limit = limit_bytes > 0 and total_effective >= limit_bytes
         if sub.get("enabled") == 0:
-            new_uuid = str(uuid.uuid4())
-            for sn in snodes:
-                if sn.get("client_disabled"):
-                    continue
-                xui = xui_clients.get(sn["node_id"])
-                if not xui:
-                    continue
-                try:
-                    ok = xui.rotate_client_uuid(sn["inbound_id"], sn["client_uuid"], sn["email"], new_uuid, enabled=False)
-                    if ok:
-                        db.update_sub_node_uuid(sid, sn["node_id"], new_uuid)
-                        db.set_sub_node_disabled(sid, sn["node_id"], True)
-                    else:
-                        ok2 = xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], False)
-                        if ok2:
-                            db.set_sub_node_disabled(sid, sn["node_id"], True)
-                except Exception as e:
-                    logger.warning(f"disable error node {sn['node_id']} sub {sid}: {e}")
+            pass
         elif is_expired or is_over_limit:
             new_uuid = str(uuid.uuid4())
             for sn in snodes:

@@ -542,12 +542,29 @@ def register_routes(panel_path):
             enabled_val = bool(body["enabled"])
             if enabled_val:
                 db.reset_sub_node_disabled(sub_id)
-            for sn in snodes:
-                try:
-                    xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
-                    xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], enabled_val)
-                except Exception:
-                    pass
+                for sn in snodes:
+                    try:
+                        xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                        xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], True)
+                    except Exception:
+                        pass
+            else:
+                new_uuid = str(uuid.uuid4())
+                for sn in snodes:
+                    if sn.get("client_disabled"):
+                        continue
+                    try:
+                        xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                        ok = xui.rotate_client_uuid(sn["inbound_id"], sn["client_uuid"], sn["email"], new_uuid, enabled=False)
+                        if ok:
+                            db.update_sub_node_uuid(sub_id, sn["node_id"], new_uuid)
+                            db.set_sub_node_disabled(sub_id, sn["node_id"], True)
+                        else:
+                            ok2 = xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], False)
+                            if ok2:
+                                db.set_sub_node_disabled(sub_id, sn["node_id"], True)
+                    except Exception:
+                        pass
         if any(k in updates for k in ("expire_at", "days", "ip_limit", "expire_after_first_use_seconds")) or body.get("remove_expiry") or "remove_days" in body:
             expire_ms = 0
             if sub and sub.get("expire_at"):
@@ -806,12 +823,31 @@ def register_routes(panel_path):
         for sub_id in sub_ids:
             db.update_sub(sub_id, enabled=1 if enabled_val else 0)
             snodes = db.get_sub_nodes(sub_id)
-            for sn in snodes:
-                try:
-                    xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
-                    xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], enabled_val)
-                except Exception:
-                    pass
+            if enabled_val:
+                db.reset_sub_node_disabled(sub_id)
+                for sn in snodes:
+                    try:
+                        xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                        xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], True)
+                    except Exception:
+                        pass
+            else:
+                new_uuid = str(uuid.uuid4())
+                for sn in snodes:
+                    if sn.get("client_disabled"):
+                        continue
+                    try:
+                        xui = XUIClient(sn["address"], sn["username"], sn["password"], sn.get("proxy_url"))
+                        ok = xui.rotate_client_uuid(sn["inbound_id"], sn["client_uuid"], sn["email"], new_uuid, enabled=False)
+                        if ok:
+                            db.update_sub_node_uuid(sub_id, sn["node_id"], new_uuid)
+                            db.set_sub_node_disabled(sub_id, sn["node_id"], True)
+                        else:
+                            ok2 = xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], False)
+                            if ok2:
+                                db.set_sub_node_disabled(sub_id, sn["node_id"], True)
+                    except Exception:
+                        pass
         return jsonify({"ok": True})
 
     @app.route(f"/{panel_path}/api/bulk/note", methods=["POST"])
