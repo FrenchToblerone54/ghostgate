@@ -465,9 +465,11 @@ def register_routes(panel_path):
         ip_limit = int(data.get("ip_limit", 0))
         show_multiplier = max(1, int(data.get("show_multiplier", 1)))
         expire_after_first_use_seconds = int(data.get("expire_after_first_use_seconds", 0))
+        expire_seconds = int(data.get("expire_seconds", 0))
         tags = data.get("tags") if isinstance(data.get("tags"), list) else []
         node_ids = [int(n) for n in data.get("node_ids", [])]
-        sub_id = db.create_sub(comment=comment, note=note, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, expire_after_first_use_seconds=expire_after_first_use_seconds, tags=tags)
+        expire_at_direct = (datetime.now(timezone.utc) + timedelta(seconds=expire_seconds)).isoformat() if expire_seconds > 0 and not expire_after_first_use_seconds else None
+        sub_id = db.create_sub(comment=comment, note=note, data_gb=data_gb, days=days, ip_limit=ip_limit, show_multiplier=show_multiplier, expire_after_first_use_seconds=expire_after_first_use_seconds, tags=tags, expire_at=expire_at_direct)
         sub = db.get_sub(sub_id)
         client_uuid = str(uuid.uuid4())
         expire_ms = 0

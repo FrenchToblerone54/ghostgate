@@ -303,9 +303,10 @@ def delete_node_inbound(ni_id):
     with _conn() as c:
         c.execute("DELETE FROM node_inbounds WHERE id=?", (ni_id,))
 
-def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True, show_multiplier=1, expire_after_first_use_seconds=0, note=None, tags=None):
+def create_sub(comment=None, data_gb=0, days=0, ip_limit=0, sub_id=None, enabled=True, show_multiplier=1, expire_after_first_use_seconds=0, note=None, tags=None, expire_at=None):
     sub_id = sub_id or generate(size=20)
-    expire_at = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat() if days > 0 and not expire_after_first_use_seconds else None
+    if not expire_at:
+        expire_at = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat() if days > 0 and not expire_after_first_use_seconds else None
     tags_json = json.dumps(tags if isinstance(tags, list) else [])
     with _conn() as c:
         c.execute(
