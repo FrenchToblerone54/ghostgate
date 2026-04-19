@@ -1138,7 +1138,7 @@ def register_routes(panel_path):
             elif not old_enabled and new_enabled:
                 _enable_subnode_clients(ni_id)
         if "traffic_multiplier" in data:
-            new_mult = float(data["traffic_multiplier"])
+            new_mult = max(0.0, float(data["traffic_multiplier"]))
             if abs(new_mult - old_mult) > 0.001:
                 ni = db.get_node_inbound_with_node(ni_id)
                 if ni:

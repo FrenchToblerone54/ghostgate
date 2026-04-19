@@ -54,6 +54,10 @@ def _sub_url(sub_id):
     base = os.getenv("BASE_URL", "").rstrip("/")
     return f"{base}/sub/{sub_id}"
 
+def _tmult(ni):
+    v = ni.get("traffic_multiplier")
+    return 1.0 if v is None else float(v)
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update.effective_user.id):
         return
@@ -121,7 +125,8 @@ async def cmd_create(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             continue
         try:
             xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
-            total_limit_bytes = int(data_gb * 1073741824 / (ni.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
+            mult = _tmult(ni)
+            total_limit_bytes = int(data_gb * 1073741824 / mult) if data_gb > 0 and mult != 0 else 0
             email = f"{sub_id}-{node_id}"
             client = xui.make_client(email, client_uuid, expiry_time, ip_limit, sub_id, comment or "", total_limit_bytes)
             if xui.add_client(ni["inbound_id"], client):
@@ -289,7 +294,7 @@ async def cmd_addnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     pwd = opts.get("pass")
     inbound = int(opts.get("inbound", 1))
     proxy = opts.get("proxy")
-    multiplier = max(1.0, float(opts.get("multiplier", 1.0)))
+    multiplier = max(0.0, float(opts.get("multiplier", 1.0)))
     if not all([name, addr, user, pwd]):
         await update.message.reply_text("Usage: /addnode --name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...] [--multiplier N]")
         return
@@ -372,7 +377,7 @@ async def cmd_addsubnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         node_id=int(opts.get("node",0))
         inbound_id=int(opts.get("inbound",0))
-        multiplier=max(1.0,float(opts.get("multiplier",1.0)))
+        multiplier=max(0.0,float(opts.get("multiplier",1.0)))
     except ValueError:
         await update.message.reply_text("Node ID, inbound ID, and multiplier must be numbers.")
         return
@@ -463,7 +468,7 @@ async def cmd_editsubnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
     if "multiplier" in opts:
         try:
-            updates["traffic_multiplier"]=max(1.0,float(opts["multiplier"]))
+            updates["traffic_multiplier"]=max(0.0,float(opts["multiplier"]))
         except ValueError:
             await update.message.reply_text("Multiplier must be a number.")
             return
@@ -483,7 +488,7 @@ async def cmd_editsubnode(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             _disable_subnode_clients(ni_id)
     updated=db.get_node_inbound_with_node(ni_id)
     st="on" if updated and updated.get("inbound_enabled") else "off"
-    mult=(updated.get("traffic_multiplier") if updated else ni.get("traffic_multiplier",1.0)) or 1.0
+    mult=_tmult(updated or ni)
     mult_str=f" ×{mult:g}" if mult!=1.0 else ""
     name=(updated.get("inbound_name") if updated else ni.get("name")) or f"Inbound {(updated.get('inbound_id') if updated else ni.get('inbound_id'))}"
     inbound_id=updated.get("inbound_id") if updated else ni.get("inbound_id")
@@ -509,7 +514,7 @@ async def cmd_subnodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lines=[f"Sub-nodes for [{node_id}] {node['name']}:\n"]
         for ni in inbounds:
             ni_status="on" if ni.get("enabled") else "off"
-            mult=ni.get("traffic_multiplier") or 1.0
+            mult=_tmult(ni)
             mult_str=f" ×{mult:g}" if mult!=1.0 else ""
             lines.append(f"[{ni['id']}] {ni['name'] or 'Inbound '+str(ni['inbound_id'])} — ID:{ni['inbound_id']}{mult_str} ({ni_status})")
         await update.message.reply_text("\n".join(lines))
@@ -528,7 +533,7 @@ async def cmd_subnodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lines.append(f"[{n['id']}] {n['name']}")
         for ni in inbounds:
             ni_status="on" if ni.get("enabled") else "off"
-            mult=ni.get("traffic_multiplier") or 1.0
+            mult=_tmult(ni)
             mult_str=f" ×{mult:g}" if mult!=1.0 else ""
             lines.append(f"  └─ [{ni['id']}] {ni['name'] or 'Inbound '+str(ni['inbound_id'])} — ID:{ni['inbound_id']}{mult_str} ({ni_status})")
     if not has_any:
@@ -643,7 +648,7 @@ async def cmd_nodes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lines.append(f"[{n['id']}] {n['name']} — {n['address']} ({status})")
         for ni in db.get_node_inbounds(n["id"]):
             ni_status = "on" if ni["enabled"] else "off"
-            mult = ni.get("traffic_multiplier") or 1.0
+            mult = _tmult(ni)
             mult_str = f" ×{mult:g}" if mult != 1.0 else ""
             lines.append(f"  └─ [{ni['id']}] {ni['name'] or 'Inbound '+str(ni['inbound_id'])} — ID:{ni['inbound_id']}{mult_str} ({ni_status})")
     await update.message.reply_text("\n".join(lines))

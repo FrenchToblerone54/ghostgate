@@ -295,6 +295,8 @@ def update_node_inbound(ni_id, **kwargs):
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
         return
+    if "traffic_multiplier" in fields:
+        fields["traffic_multiplier"] = max(0.0, float(fields["traffic_multiplier"]))
     sets = ", ".join(f"{k}=?" for k in fields)
     with _conn() as c:
         c.execute(f"UPDATE node_inbounds SET {sets} WHERE id=?", (*fields.values(), ni_id))

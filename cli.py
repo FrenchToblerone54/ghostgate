@@ -69,6 +69,10 @@ def _exp_str(sub):
     except Exception:
         return Text(sub["expire_at"][:10], style=MUTED)
 
+def _tmult(ni):
+    v = ni.get("traffic_multiplier")
+    return 1.0 if v is None else float(v)
+
 def _parse_opts(raw_args):
     opts = {}
     i = 0
@@ -176,7 +180,7 @@ def cmd_nodes(args):
         lines.append(f"[bold white][{n['id']}] {n['name']}[/]  [{BLUE}]{n['address']}[/]  {status_text}{proxy_text}")
         for ni in db.get_node_inbounds(n["id"]):
             ni_status = f"[{ACC}]On[/]" if ni.get("enabled") else f"[{DANGER}]Off[/]"
-            mult = ni.get("traffic_multiplier") or 1.0
+            mult = _tmult(ni)
             mult_str = f"  [{WARN}]×{mult:g}[/]" if mult != 1.0 else ""
             lines.append(f"  [{DIM}]└─[/] [{MUTED}][{ni['id']}][/] {ni['name'] or 'Inbound '+str(ni['inbound_id'])}  [{MUTED}]ID:{ni['inbound_id']}[/]{mult_str}  {ni_status}")
     console.print(Panel("\n".join(lines), title=f"[bold white]Nodes[/]", border_style=DIM, padding=(0, 1)))
@@ -199,7 +203,7 @@ def cmd_subnodes(args):
         lines = [f"[bold white]Sub-nodes for [{node_id}] {node['name']}[/]"]
         for ni in inbounds:
             ni_status = f"[{ACC}]On[/]" if ni.get("enabled") else f"[{DANGER}]Off[/]"
-            mult = ni.get("traffic_multiplier") or 1.0
+            mult = _tmult(ni)
             mult_str = f"  [{WARN}]×{mult:g}[/]" if mult != 1.0 else ""
             lines.append(f"  [{MUTED}][{ni['id']}][/] {ni['name'] or 'Inbound '+str(ni['inbound_id'])}  [{MUTED}]ID:{ni['inbound_id']}[/]{mult_str}  {ni_status}")
         console.print(Panel("\n".join(lines), border_style=DIM, padding=(0, 1)))
@@ -218,7 +222,7 @@ def cmd_subnodes(args):
         lines.append(f"[bold white][{n['id']}] {n['name']}[/]")
         for ni in inbounds:
             ni_status = f"[{ACC}]On[/]" if ni.get("enabled") else f"[{DANGER}]Off[/]"
-            mult = ni.get("traffic_multiplier") or 1.0
+            mult = _tmult(ni)
             mult_str = f"  [{WARN}]×{mult:g}[/]" if mult != 1.0 else ""
             lines.append(f"  [{DIM}]└─[/] [{MUTED}][{ni['id']}][/] {ni['name'] or 'Inbound '+str(ni['inbound_id'])}  [{MUTED}]ID:{ni['inbound_id']}[/]{mult_str}  {ni_status}")
     if not has_any:
@@ -270,7 +274,7 @@ def cmd_addsubnode(args):
     try:
         node_id = int(opts.get("node", 0))
         inbound_id = int(opts.get("inbound", 0))
-        multiplier = max(1.0, float(opts.get("multiplier", 1.0)))
+        multiplier = max(0.0, float(opts.get("multiplier", 1.0)))
     except ValueError:
         console.print(f"[{DANGER}]Node ID, inbound ID, and multiplier must be numeric.[/]")
         return
@@ -338,7 +342,7 @@ def cmd_editsubnode(args):
             return
     if "multiplier" in opts:
         try:
-            updates["traffic_multiplier"] = max(1.0, float(opts["multiplier"]))
+            updates["traffic_multiplier"] = max(0.0, float(opts["multiplier"]))
         except ValueError:
             console.print(f"[{DANGER}]Multiplier must be a number.[/]")
             return
@@ -358,7 +362,7 @@ def cmd_editsubnode(args):
             _disable_subnode_clients(ni_id)
     updated = db.get_node_inbound(ni_id) or ni
     st = f"[{ACC}]On[/]" if updated.get("enabled") else f"[{DANGER}]Off[/]"
-    mult = updated.get("traffic_multiplier") or 1.0
+    mult = _tmult(updated)
     mult_str = f" [{WARN}]×{mult:g}[/]" if mult != 1.0 else ""
     console.print(f"[{ACC}]Updated sub-node:[/] [{MUTED}][{ni_id}][/] {updated.get('name') or 'Inbound '+str(updated.get('inbound_id'))}{mult_str} [{MUTED}]ID:{updated.get('inbound_id')}[/] {st}")
 
@@ -442,7 +446,8 @@ def cmd_create(args):
         if not ni: continue
         try:
             xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
-            total_limit_bytes = int(data_gb * 1073741824 / (ni.get("traffic_multiplier") or 1.0)) if data_gb > 0 else 0
+            mult = _tmult(ni)
+            total_limit_bytes = int(data_gb * 1073741824 / mult) if data_gb > 0 and mult != 0 else 0
             email = f"{sub_id}-{node_id}"
             client = xui.make_client(email, client_uuid, expiry_time, ip_limit, sub_id, comment, total_limit_bytes)
             ok = xui.add_client(ni["inbound_id"], client)
@@ -542,7 +547,7 @@ def cmd_addnode(args):
     pwd = opts.get("pass")
     inbound = int(opts.get("inbound", 1))
     proxy = opts.get("proxy")
-    multiplier = max(1.0, float(opts.get("multiplier", 1.0)))
+    multiplier = max(0.0, float(opts.get("multiplier", 1.0)))
     if not all([name, addr, user, pwd]):
         console.print(f"[{DANGER}]Usage: ghostgate addnode --name X --addr http://host:port --user X --pass X --inbound N [--proxy http://...] [--multiplier N][/]")
         return
