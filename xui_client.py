@@ -108,6 +108,17 @@ class XUIClient:
         r = self.session.post(f"{self.base}/panel/api/inbounds/{inbound_id}/resetClientTraffic/{email}", timeout=10)
         return r.json().get("success", False)
 
+    def restart_xray(self):
+        for path in ("/panel/api/server/restartXrayService", "/panel/api/inbounds/restartXrayService", "/panel/api/server/restartXray", "/panel/api/inbounds/restartXray"):
+            try:
+                r = self.session.post(f"{self.base}{path}", timeout=15)
+                data = r.json()
+                if data.get("success"):
+                    return True
+            except Exception:
+                pass
+        return False
+
     def test_connection(self):
         try:
             self._login()

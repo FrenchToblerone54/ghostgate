@@ -473,6 +473,7 @@ Refresh
 <div class="fg"><label class="fl">Log File</label><input class="fi" id="cfg-log" placeholder="/var/log/ghostgate.log"></div>
 <div class="fg"><label class="fl">Update Proxy (optional)</label><input class="fi" id="cfg-update-proxy" placeholder="http://proxy:3128"></div>
 <div class="fg"><label class="fl">Auto Update</label><select class="fi" id="cfg-auto-update"><option value="false">Disabled</option><option value="true">Enabled</option></select></div>
+<div class="fg"><label class="fl">GhostGate</label><select class="fi" id="cfg-ghostgate-restart"><option value="false">Do not restart node Xray</option><option value="true">Restart node Xray for overlimit/expired sub-nodes</option></select></div>
 </div>
 </div>
 <div class="card">
@@ -1381,6 +1382,7 @@ async function loadSettings(){
   document.getElementById("cfg-proxy").value=s.BOT_PROXY||"";
   document.getElementById("cfg-update-proxy").value=s.UPDATE_PROXY||"";
   document.getElementById("cfg-auto-update").value=(s.AUTO_UPDATE||"false").toLowerCase();
+  document.getElementById("cfg-ghostgate-restart").value=(s.GHOSTGATE_RESTART_OVERLIMIT_EXPIRED||"false").toLowerCase();
 }
 async function saveSettings(){
   const body={
@@ -1400,7 +1402,8 @@ async function saveSettings(){
     ADMIN_ID:document.getElementById("cfg-admin").value.trim(),
     BOT_PROXY:document.getElementById("cfg-proxy").value.trim(),
     UPDATE_PROXY:document.getElementById("cfg-update-proxy").value.trim(),
-    AUTO_UPDATE:document.getElementById("cfg-auto-update").value
+    AUTO_UPDATE:document.getElementById("cfg-auto-update").value,
+    GHOSTGATE_RESTART_OVERLIMIT_EXPIRED:document.getElementById("cfg-ghostgate-restart").value
   };
   Object.keys(body).forEach(k=>{if(!body[k])delete body[k];});
   await fetch(API+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});

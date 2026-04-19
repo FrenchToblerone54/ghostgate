@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 import logging
@@ -7,6 +8,9 @@ import database as db
 from xui_client import XUIClient
 
 logger = logging.getLogger("sync")
+
+def _ghostgate_restart_enabled():
+    return os.getenv("GHOSTGATE_RESTART_OVERLIMIT_EXPIRED", "false").lower() == "true"
 
 def _tmult(sn):
     v = sn.get("traffic_multiplier")
@@ -20,6 +24,7 @@ def _sync_once():
         nodes_by_sub.setdefault(sn["sub_id"], []).append(sn)
     _xui_sessions = {}
     _xui_failed = set()
+    restart_keys = set()
     for sub in subs:
         sid = sub["id"]
         snodes = nodes_by_sub.get(sid, [])
@@ -73,10 +78,14 @@ def _sync_once():
                     if ok:
                         db.update_sub_node_uuid(sid, sn["node_id"], new_uuid)
                         db.set_sub_node_disabled(sid, sn["node_id"], True)
+                        if _ghostgate_restart_enabled():
+                            restart_keys.add((sn["address"], sn["username"]))
                     else:
                         ok2 = xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], False)
                         if ok2:
                             db.set_sub_node_disabled(sid, sn["node_id"], True)
+                            if _ghostgate_restart_enabled():
+                                restart_keys.add((sn["address"], sn["username"]))
                 except Exception as e:
                     logger.warning(f"disable error node {sn['node_id']} sub {sid}: {e}")
         else:
@@ -99,6 +108,18 @@ def _sync_once():
                         xui.update_client_limit(sn["inbound_id"], sn["client_uuid"], sn["email"], node_limit)
                     except Exception as e:
                         logger.warning(f"limit update error node {sn['node_id']} sub {sid}: {e}")
+    if restart_keys:
+        for key in restart_keys:
+            xui = _xui_sessions.get(key)
+            if not xui:
+                continue
+            try:
+                if xui.restart_xray():
+                    logger.info(f"GhostGate restarted Xray on {key[0]}")
+                else:
+                    logger.warning(f"GhostGate failed to restart Xray on {key[0]}")
+            except Exception as e:
+                logger.warning(f"GhostGate restart error on {key[0]}: {e}")
 
 def _sync_first_use_expiry():
     subs = db.get_subs_pending_first_use_expiry()

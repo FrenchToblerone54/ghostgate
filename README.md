@@ -74,6 +74,7 @@ All settings are stored in `/opt/ghostgate/.env`. They can also be edited from t
 | `LOG_FILE` | `/var/log/ghostgate.log` | Log file path |
 | `AUTO_UPDATE` | `false` | Enable automatic binary updates |
 | `UPDATE_CHECK_INTERVAL` | `300` | Seconds between update checks |
+| `GHOSTGATE_RESTART_OVERLIMIT_EXPIRED` | `false` | Restart affected 3x-ui Xray services when sub-nodes are newly disabled due to overlimit or expiry |
 
 ## REST API
 
