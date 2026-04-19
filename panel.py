@@ -168,8 +168,30 @@ def _fmt_vmess(client_uuid, label, server, port, stream_settings, security):
         if sni:
             tls["serverName"] = sni
         stream["tlsSettings"] = tls
-    outbound = {"tag": "proxy", "protocol": "vmess", "settings": {"vnext": [{"address": server, "port": port, "users": [{"id": client_uuid, "security": "auto", "level": 8}]}]}, "streamSettings": stream}
-    return json.dumps({"remarks": label, "outbounds": [outbound]}, separators=(",", ":"))
+    if allow_insecure:
+        outbound = {"tag": "proxy", "protocol": "vmess", "settings": {"vnext": [{"address": server, "port": port, "users": [{"id": client_uuid, "security": "auto", "level": 8}]}]}, "streamSettings": stream}
+        return json.dumps({"remarks": label, "outbounds": [outbound]}, separators=(",", ":"))
+    obj = {"v": "2", "ps": label, "add": server, "port": port, "id": client_uuid, "aid": 0, "scy": "auto", "net": net, "type": "none", "host": "", "path": "", "tls": "tls" if security == "tls" else "none", "sni": tls_s.get("serverName", ""), "alpn": ",".join(tls_s.get("alpn", [])), "fp": tls_s.get("settings", {}).get("fingerprint", "") or tls_s.get("fingerprint", "")}
+    if net == "ws":
+        obj["path"] = ws_s.get("path", "/")
+        obj["host"] = ws_s.get("host", "") or ws_s.get("headers", {}).get("Host", "")
+    elif net == "grpc":
+        obj["path"] = grpc_s.get("serviceName", "")
+        if grpc_s.get("multiMode"):
+            obj["type"] = "multi"
+        if grpc_s.get("authority"):
+            obj["authority"] = grpc_s["authority"]
+    elif net == "tcp":
+        htype = tcp_s.get("header", {}).get("type", "none")
+        obj["type"] = htype
+        if htype != "none":
+            obj["path"] = (tcp_s.get("header", {}).get("request", {}).get("path") or ["/"])[0]
+            obj["host"] = (tcp_s.get("header", {}).get("request", {}).get("headers", {}).get("Host") or [""])[0]
+    elif net in ("httpupgrade", "xhttp"):
+        s = hu_s if net == "httpupgrade" else xhttp_s
+        obj["path"] = s.get("path", "/")
+        obj["host"] = s.get("host", "") or next((v for k, v in (s.get("headers") or {}).items() if k.lower() == "host"), "")
+    return "vmess://" + base64.b64encode(json.dumps(obj, separators=(",", ":")).encode()).decode()
 
 def _build_sub_configs(sub_id):
     snodes = db.get_sub_nodes(sub_id)
