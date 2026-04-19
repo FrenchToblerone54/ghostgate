@@ -354,6 +354,10 @@ def cmd_editsubnode(args):
         console.print(f"[{WARN}]No valid changes provided.[/]")
         return
     db.update_node_inbound(ni_id, **updates)
+    if "traffic_multiplier" in updates and abs(updates["traffic_multiplier"]-_tmult(ni))>0.001:
+        from panel import _checkpoint_subnode_traffic, _refresh_subnode_client_limits
+        _checkpoint_subnode_traffic(ni_id, _tmult(ni))
+        _refresh_subnode_client_limits(ni_id)
     if "enabled" in updates:
         from panel import _disable_subnode_clients, _enable_subnode_clients
         if updates["enabled"]:

@@ -366,6 +366,43 @@ def _enable_subnode_clients(ni_id):
         except Exception:
             pass
 
+def _checkpoint_subnode_traffic(ni_id, old_mult):
+    ni = db.get_node_inbound_with_node(ni_id)
+    if not ni:
+        return
+    try:
+        xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+    except Exception:
+        return
+    for sn in db.get_sub_nodes_for_inbound(ni_id):
+        try:
+            t = xui.get_client_traffic(sn["email"])
+            raw = ((t.get("up") or 0) + (t.get("down") or 0)) if t else 0
+            old_offset = sn.get("traffic_offset") or 0.0
+            old_baseline = sn.get("traffic_baseline") or 0
+            adjusted_raw = max(0, raw - old_baseline)
+            db.set_sub_node_traffic_offset(sn["sub_id"], sn["node_id"], old_offset + adjusted_raw * old_mult, raw)
+        except Exception:
+            pass
+
+def _refresh_subnode_client_limits(ni_id):
+    ni = db.get_node_inbound_with_node(ni_id)
+    if not ni:
+        return
+    try:
+        xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
+    except Exception:
+        return
+    mult = _tmult(ni)
+    for sn in db.get_sub_nodes_for_inbound(ni_id):
+        try:
+            sub = db.get_sub(sn["sub_id"])
+            if not sub:
+                continue
+            xui.update_client_limit(ni["inbound_id"], sn["client_uuid"], sn["email"], _tlimit(sub.get("data_gb") or 0, sub.get("used_bytes") or 0, mult))
+        except Exception:
+            pass
+
 def _disable_node_clients(node_id):
     node = db.get_node(node_id)
     if not node:
@@ -1140,20 +1177,8 @@ def register_routes(panel_path):
         if "traffic_multiplier" in data:
             new_mult = max(0.0, float(data["traffic_multiplier"]))
             if abs(new_mult - old_mult) > 0.001:
-                ni = db.get_node_inbound_with_node(ni_id)
-                if ni:
-                    for sn in db.get_sub_nodes_for_inbound(ni_id):
-                        try:
-                            xui = XUIClient(ni["address"], ni["username"], ni["password"], ni.get("proxy_url"))
-                            t = xui.get_client_traffic(sn["email"])
-                            raw = ((t.get("up") or 0) + (t.get("down") or 0)) if t else 0
-                            old_offset = sn.get("traffic_offset") or 0.0
-                            old_baseline = sn.get("traffic_baseline") or 0
-                            adjusted_raw = max(0, raw - old_baseline)
-                            new_offset = old_offset + adjusted_raw * old_mult
-                            db.set_sub_node_traffic_offset(sn["sub_id"], sn["node_id"], new_offset, raw)
-                        except Exception:
-                            pass
+                _checkpoint_subnode_traffic(ni_id, old_mult)
+                _refresh_subnode_client_limits(ni_id)
         if "inbound_id" in data and old_inbound_id and int(data["inbound_id"]) != int(old_inbound_id):
             ni_with_node = db.get_node_inbound_with_node(ni_id)
             if ni_with_node:
