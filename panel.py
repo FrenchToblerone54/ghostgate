@@ -141,7 +141,7 @@ def _fmt_vmess(client_uuid, label, server, port, stream_settings, security):
     xhttp_s = stream_settings.get("xhttpSettings", {})
     tls_s = stream_settings.get("tlsSettings", {})
     allow_insecure = tls_s.get("allowInsecure") or tls_s.get("settings", {}).get("allowInsecure")
-    obj = {"v": "2", "ps": label, "add": server, "port": port, "id": client_uuid, "aid": 0, "scy": "auto", "net": net, "type": "none", "host": "", "path": "", "tls": "tls" if security == "tls" else "none", "sni": tls_s.get("serverName", ""), "alpn": ",".join(tls_s.get("alpn", [])), "fp": tls_s.get("settings", {}).get("fingerprint", "") or tls_s.get("fingerprint", ""), **({"allowInsecure": True} if allow_insecure else {})}
+    obj = {"v": "2", "ps": label, "add": server, "port": port, "id": client_uuid, "aid": 0, "scy": "auto", "net": net, "type": "none", "host": "", "path": "", "tls": "tls" if security == "tls" else "none", "sni": tls_s.get("serverName", ""), "alpn": ",".join(tls_s.get("alpn", [])), "fp": tls_s.get("settings", {}).get("fingerprint", "") or tls_s.get("fingerprint", ""), **({"allowInsecure": 1} if allow_insecure else {})}
     if net == "ws":
         obj["path"] = ws_s.get("path", "/")
         obj["host"] = ws_s.get("host", "") or ws_s.get("headers", {}).get("Host", "")
