@@ -538,11 +538,11 @@ Refresh
 <div class="fg"><label class="fl">Tags (comma-separated, admin only)</label><input class="fi" id="me-tags" placeholder="e.g. premium, europe"></div>
 <div class="fr">
 <div class="fg"><label class="fl">Data Limit (GB)</label><input class="fi" id="me-data" type="number" min="0" step="0.1"></div>
-<div class="fg"><label class="fl">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0"></div>
+<div class="fg"><label class="fl">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0" oninput="syncEditExpiryMode()"></div>
 </div>
-<div class="fg" style="margin-top:-6px"><label class="fl" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="me-firstuse" style="accent-color:var(--accent)" onchange="document.getElementById('me-firstuse-days').style.display=this.checked?'':'none'">Start expiry after first use</label></div>
+<div class="fg" style="margin-top:-6px"><label class="fl" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="me-firstuse" style="accent-color:var(--accent)" onchange="syncEditExpiryMode()">Start expiry after first use</label></div>
 <div class="fg" id="me-firstuse-days" style="display:none"><label class="fl">First-use expiry (days)</label><input class="fi" type="number" value="30" min="1"></div>
-<div class="fg"><label class="fl">Set Exact Expiry Date</label><input class="fi" id="me-expire-date" type="date"></div>
+<div class="fg"><label class="fl">Set Exact Expiry Date</label><input class="fi" id="me-expire-date" type="date" onchange="syncEditExpiryMode()"></div>
 <div style="display:flex;gap:8px"><button id="me-no-expire-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoExpire()">Set No Expiry</button><button id="me-no-limit-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoDataLimit()">Set No Data Limit</button></div>
 <div class="fg"><label class="fl">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="me-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
@@ -1013,14 +1013,24 @@ async function editSub(id){
   _initNodeOrderDrag();
   document.getElementById("me-nodes").innerHTML=_renderInboundSelector(nodes,assignedIds,"me-nodes");
   _renderPresets("me-nodes");
+  syncEditExpiryMode();
   document.getElementById("m-edit").classList.add("open");
 }
 
 let _removeExpiry=false,_removeDataLimit=false;
+function syncEditExpiryMode(){
+  const firstuse=document.getElementById("me-firstuse").checked;
+  const days=parseInt(document.getElementById("me-days").value)||0;
+  const expireDate=document.getElementById("me-expire-date");
+  document.getElementById("me-firstuse-days").style.display=firstuse?"":"none";
+  expireDate.disabled=_removeExpiry||firstuse||days!==0;
+  document.getElementById("me-days").disabled=_removeExpiry||firstuse;
+}
 function setNoExpire(){
   _removeExpiry=!_removeExpiry;
-  document.getElementById("me-days").disabled=_removeExpiry;
+  if(_removeExpiry){ document.getElementById("me-expire-date").value=""; }
   if(_removeExpiry){ document.getElementById("me-days").value=0; }
+  syncEditExpiryMode();
   document.getElementById("me-no-expire-btn").textContent=_removeExpiry?"✓ No Expiry Set":"Set No Expiry";
   document.getElementById("me-no-expire-btn").style.color=_removeExpiry?"var(--accent)":"";
 }
@@ -1034,8 +1044,13 @@ function setNoDataLimit(){
 async function submitEdit(){
   if(!editingSubId) return;
   const body={comment:document.getElementById("me-comment").value.trim(),note:document.getElementById("me-note").value.trim()||null,tags:document.getElementById("me-tags").value.split(",").map(t=>t.trim()).filter(t=>t),data_gb:_removeDataLimit?0:parseFloat(document.getElementById("me-data").value)||0,ip_limit:parseInt(document.getElementById("me-ip").value)||0,show_multiplier:parseInt(document.getElementById("me-sm").value)||1};
-  if(_removeExpiry){ body.remove_expiry=true; } else { const expDate=document.getElementById("me-expire-date").value; if(expDate){ body.expire_at=expDate; } else { const days=parseInt(document.getElementById("me-days").value)||0; if(days>0) body.days=days; else if(days<0) body.remove_days=-days; } }
-  if(document.getElementById("me-firstuse").checked){ const d=parseInt(document.getElementById("me-firstuse-days").querySelector("input").value)||0; body.expire_after_first_use_seconds=Math.max(0,d*86400); } else { body.expire_after_first_use_seconds=0; }
+  const firstuse=document.getElementById("me-firstuse").checked;
+  const days=parseInt(document.getElementById("me-days").value)||0;
+  if(firstuse){ const d=parseInt(document.getElementById("me-firstuse-days").querySelector("input").value)||0; body.expire_after_first_use_seconds=Math.max(0,d*86400); }
+  else { body.expire_after_first_use_seconds=0; }
+  if(_removeExpiry){ body.remove_expiry=true; }
+  else if(!firstuse&&days!==0){ if(days>0) body.days=days; else body.remove_days=-days; }
+  else if(!firstuse){ const expDate=document.getElementById("me-expire-date").value; if(expDate) body.expire_at=expDate; }
   const checked=new Set([...document.querySelectorAll("#me-nodes input:checked")].map(i=>parseInt(i.value)));
   const toAdd=[...checked].filter(id=>!editingOrigNodes.has(id));
   const toRemove=[...editingOrigNodes].filter(id=>!checked.has(id));

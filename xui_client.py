@@ -87,6 +87,20 @@ class XUIClient:
         client["totalGB"] = total_limit_bytes
         return self.update_client(inbound_id, client_uuid, client)
 
+    def sync_client(self, inbound_id, client_uuid, email, enabled=None, expire_ms=None, ip_limit=None, total_limit_bytes=None):
+        client = self.get_client_by_email(inbound_id, email)
+        if not client:
+            return False
+        if enabled is not None:
+            client["enable"] = enabled
+        if expire_ms is not None:
+            client["expiryTime"] = expire_ms
+        if ip_limit is not None:
+            client["limitIp"] = ip_limit
+        if total_limit_bytes is not None:
+            client["totalGB"] = total_limit_bytes
+        return self.update_client(inbound_id, client_uuid, client)
+
     def update_client_email_subid(self, inbound_id, client_uuid, old_email, new_email, new_sub_id):
         client = self.get_client_by_email(inbound_id, old_email)
         if not client:

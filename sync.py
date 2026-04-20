@@ -16,6 +16,16 @@ def _tmult(sn):
     v = sn.get("traffic_multiplier")
     return 1.0 if v is None else float(v)
 
+def _sub_expiry_time(sub):
+    expire_ms = 0
+    if sub.get("expire_at"):
+        try:
+            expire_ms = int(datetime.fromisoformat(sub["expire_at"]).replace(tzinfo=timezone.utc).timestamp() * 1000)
+        except Exception:
+            pass
+    expire_after = int(sub.get("expire_after_first_use_seconds") or 0)
+    return -expire_after*1000 if expire_after>0 and not sub.get("expire_at") else expire_ms
+
 def _sync_once():
     subs, _ = db.get_subs(page=1, per_page=100000)
     all_snodes = db.get_all_sub_nodes()
@@ -90,20 +100,22 @@ def _sync_once():
                     logger.warning(f"disable error node {sn['node_id']} sub {sid}: {e}")
         else:
             remaining = max(0, limit_bytes - total_effective) if limit_bytes > 0 else 0
+            expiry_time = _sub_expiry_time(sub)
+            ip_limit = sub.get("ip_limit", 0)
             for sn in snodes:
                 xui = xui_clients.get(sn["node_id"])
                 if not xui:
                     continue
+                mult = _tmult(sn)
+                node_limit = int(node_bytes.get(sn["node_id"], 0) + remaining / mult) if limit_bytes > 0 and mult > 0 else 0
                 if sn.get("client_disabled"):
                     try:
-                        ok = xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], True)
+                        ok = xui.sync_client(sn["inbound_id"], sn["client_uuid"], sn["email"], enabled=True, expire_ms=expiry_time, ip_limit=ip_limit, total_limit_bytes=node_limit)
                         if ok:
                             db.set_sub_node_disabled(sid, sn["node_id"], False)
                     except Exception as e:
                         logger.warning(f"re-enable error node {sn['node_id']} sub {sid}: {e}")
                 if limit_bytes > 0 and traffic_changed:
-                    mult = _tmult(sn)
-                    node_limit = int(node_bytes.get(sn["node_id"], 0) + remaining / mult) if mult > 0 else 0
                     try:
                         xui.update_client_limit(sn["inbound_id"], sn["client_uuid"], sn["email"], node_limit)
                     except Exception as e:
