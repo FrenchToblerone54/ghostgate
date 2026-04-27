@@ -65,6 +65,7 @@ CREATE TABLE subscriptions (
     show_multiplier INTEGER DEFAULT 1,
     expire_after_first_use_seconds INTEGER DEFAULT 0,
     tags TEXT DEFAULT '[]',
+    traffic_preserved REAL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE subscription_nodes (
@@ -73,6 +74,8 @@ CREATE TABLE subscription_nodes (
     client_uuid TEXT NOT NULL,
     email TEXT NOT NULL,
     client_disabled INTEGER DEFAULT 0,
+    traffic_offset REAL DEFAULT 0,
+    traffic_baseline INTEGER DEFAULT 0,
     "order" INTEGER DEFAULT 0,
     PRIMARY KEY (sub_id, node_id),
     FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
@@ -221,6 +224,12 @@ FROM nodes n""")
             if not _col_exists("subscriptions", "traffic_preserved"):
                 c.execute("ALTER TABLE subscriptions ADD COLUMN traffic_preserved REAL DEFAULT 0")
             c.execute("PRAGMA user_version=9")
+        if not _col_exists("subscription_nodes", "traffic_offset"):
+            c.execute("ALTER TABLE subscription_nodes ADD COLUMN traffic_offset REAL DEFAULT 0")
+        if not _col_exists("subscription_nodes", "traffic_baseline"):
+            c.execute("ALTER TABLE subscription_nodes ADD COLUMN traffic_baseline INTEGER DEFAULT 0")
+        if not _col_exists("subscriptions", "traffic_preserved"):
+            c.execute("ALTER TABLE subscriptions ADD COLUMN traffic_preserved REAL DEFAULT 0")
 
 def add_node(name, address, username, password, proxy_url=None):
     with _conn() as c:
