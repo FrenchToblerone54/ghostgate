@@ -283,8 +283,8 @@ def sub_page(sub_id):
         expire_str = "After First Use"
     else:
         expire_str = "No Expiry"
-    data_label = os.getenv("DATA_LABEL", "⬇️ Data left")
-    expire_label = os.getenv("EXPIRE_LABEL", "⏰ Expires")
+    data_label = os.getenv("DATA_LABEL") or "⬇️ Data left"
+    expire_label = os.getenv("EXPIRE_LABEL") or "⏰ Expires"
     is_browser = any(b in ua for b in ["Mozilla", "Chrome", "Safari", "Firefox", "Edge", "Opera"])
     if is_browser:
         qr_b64 = _make_qr_b64(sub_url)
