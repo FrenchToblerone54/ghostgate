@@ -19,7 +19,7 @@ def _conn():
     finally:
         c.close()
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 def init_db():
     with _conn() as c:
@@ -224,12 +224,14 @@ FROM nodes n""")
             if not _col_exists("subscriptions", "traffic_preserved"):
                 c.execute("ALTER TABLE subscriptions ADD COLUMN traffic_preserved REAL DEFAULT 0")
             c.execute("PRAGMA user_version=9")
-        if not _col_exists("subscription_nodes", "traffic_offset"):
-            c.execute("ALTER TABLE subscription_nodes ADD COLUMN traffic_offset REAL DEFAULT 0")
-        if not _col_exists("subscription_nodes", "traffic_baseline"):
-            c.execute("ALTER TABLE subscription_nodes ADD COLUMN traffic_baseline INTEGER DEFAULT 0")
-        if not _col_exists("subscriptions", "traffic_preserved"):
-            c.execute("ALTER TABLE subscriptions ADD COLUMN traffic_preserved REAL DEFAULT 0")
+        if user_ver < 10:
+            if not _col_exists("subscription_nodes", "traffic_offset"):
+                c.execute("ALTER TABLE subscription_nodes ADD COLUMN traffic_offset REAL DEFAULT 0")
+            if not _col_exists("subscription_nodes", "traffic_baseline"):
+                c.execute("ALTER TABLE subscription_nodes ADD COLUMN traffic_baseline INTEGER DEFAULT 0")
+            if not _col_exists("subscriptions", "traffic_preserved"):
+                c.execute("ALTER TABLE subscriptions ADD COLUMN traffic_preserved REAL DEFAULT 0")
+            c.execute("PRAGMA user_version=10")
 
 def add_node(name, address, username, password, proxy_url=None):
     with _conn() as c:
