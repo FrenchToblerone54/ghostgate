@@ -34,7 +34,7 @@ def _sync_once():
         nodes_by_sub.setdefault(sn["sub_id"], []).append(sn)
     _xui_sessions = {}
     _xui_failed = set()
-    restart_keys = set()
+    restart_reasons = {}
     for sub in subs:
         sid = sub["id"]
         snodes = nodes_by_sub.get(sid, [])
@@ -76,6 +76,7 @@ def _sync_once():
         if sub.get("enabled") == 0:
             pass
         elif is_expired or is_over_limit:
+            disable_reason = "expired" if is_expired else f"over limit ({total_effective/1073741824:.2f}/{sub['data_gb']} GB)"
             new_uuid = str(uuid.uuid4())
             for sn in snodes:
                 if sn.get("client_disabled"):
@@ -88,20 +89,26 @@ def _sync_once():
                     if ok:
                         db.update_sub_node_uuid(sid, sn["node_id"], new_uuid)
                         db.set_sub_node_disabled(sid, sn["node_id"], True)
+                        logger.info(f"Disabled client {sn['email']} on {sn['address']} (sub {sid}): {disable_reason}")
                         if _ghostgate_restart_enabled():
-                            restart_keys.add((sn["address"], sn["username"]))
+                            restart_reasons.setdefault((sn["address"], sn["username"]), []).append(f"sub {sid} {sn['email']}: {disable_reason}")
                     else:
                         ok2 = xui.set_client_enabled(sn["inbound_id"], sn["client_uuid"], sn["email"], False)
                         if ok2:
                             db.set_sub_node_disabled(sid, sn["node_id"], True)
+                            logger.info(f"Disabled client {sn['email']} on {sn['address']} (sub {sid}): {disable_reason}")
                             if _ghostgate_restart_enabled():
-                                restart_keys.add((sn["address"], sn["username"]))
+                                restart_reasons.setdefault((sn["address"], sn["username"]), []).append(f"sub {sid} {sn['email']}: {disable_reason}")
+                        else:
+                            logger.warning(f"Client {sn['email']} on {sn['address']} (sub {sid}) not found in panel — skipping disable ({disable_reason})")
+                            db.set_sub_node_disabled(sid, sn["node_id"], True)
                 except Exception as e:
                     logger.warning(f"disable error node {sn['node_id']} sub {sid}: {e}")
         else:
             remaining = max(0, limit_bytes - total_effective) if limit_bytes > 0 else 0
             expiry_time = _sub_expiry_time(sub)
             ip_limit = sub.get("ip_limit", 0)
+            any_node_failed = any((sn["address"], sn["username"]) in _xui_failed for sn in snodes)
             for sn in snodes:
                 xui = xui_clients.get(sn["node_id"])
                 if not xui:
@@ -109,10 +116,13 @@ def _sync_once():
                 mult = _tmult(sn)
                 node_limit = int(node_bytes.get(sn["node_id"], 0) + remaining / mult) if limit_bytes > 0 and mult > 0 else 0
                 if sn.get("client_disabled"):
+                    if limit_bytes > 0 and any_node_failed:
+                        continue
                     try:
                         ok = xui.sync_client(sn["inbound_id"], sn["client_uuid"], sn["email"], enabled=True, expire_ms=expiry_time, ip_limit=ip_limit, total_limit_bytes=node_limit)
                         if ok:
                             db.set_sub_node_disabled(sid, sn["node_id"], False)
+                            logger.info(f"Re-enabled client {sn['email']} on {sn['address']} (sub {sid}): traffic {total_effective/1073741824:.2f}/{sub['data_gb']} GB")
                     except Exception as e:
                         logger.warning(f"re-enable error node {sn['node_id']} sub {sid}: {e}")
                 if limit_bytes > 0 and traffic_changed:
@@ -120,16 +130,16 @@ def _sync_once():
                         xui.update_client_limit(sn["inbound_id"], sn["client_uuid"], sn["email"], node_limit)
                     except Exception as e:
                         logger.warning(f"limit update error node {sn['node_id']} sub {sid}: {e}")
-    if restart_keys:
-        for key in restart_keys:
+    if restart_reasons:
+        for key, reasons in restart_reasons.items():
             xui = _xui_sessions.get(key)
             if not xui:
                 continue
             try:
                 if xui.restart_xray():
-                    logger.info(f"GhostGate restarted Xray on {key[0]}")
+                    logger.info(f"GhostGate restarted Xray on {key[0]} — reasons: {'; '.join(reasons)}")
                 else:
-                    logger.warning(f"GhostGate failed to restart Xray on {key[0]}")
+                    logger.warning(f"GhostGate failed to restart Xray on {key[0]} — intended for: {'; '.join(reasons)}")
             except Exception as e:
                 logger.warning(f"GhostGate restart error on {key[0]}: {e}")
 
