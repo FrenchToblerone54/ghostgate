@@ -222,40 +222,77 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .cfg-grid{grid-template-columns:1fr}
 }
 @media(max-width:600px){.gauges{grid-template-columns:1fr 1fr}.fr{grid-template-columns:1fr}.stats-bar{grid-template-columns:repeat(3,1fr)}}
+[data-theme="light"]{
+--bg:#f1f5f9;
+--bg2:#e8edf5;
+--sidebar:#dde4ee;
+--card:#ffffff;
+--card2:#f0f4f9;
+--border:#cdd6e0;
+--border2:#b5c3d0;
+--accent:#00b87a;
+--accent-dim:rgba(0,184,122,0.12);
+--accent-border:rgba(0,184,122,0.3);
+--accent-glow:rgba(0,184,122,0.15);
+--danger:#dc2626;
+--danger-dim:rgba(220,38,38,0.1);
+--warning:#d97706;
+--warning-dim:rgba(217,119,6,0.1);
+--blue:#2563eb;
+--blue-dim:rgba(37,99,235,0.1);
+--text:#1e293b;
+--text2:#475569;
+--text3:#94a3b8;
+--shadow:0 4px 24px rgba(0,0,0,0.08);
+}
+[data-theme="light"] .nav-item.active{color:#fff}
+[data-theme="light"] .btn-accent{color:#fff}
+[data-theme="light"] .pag-btn.cur{color:#fff}
+.sidebar-controls{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--border)}
+.ctrl-btn{display:flex;align-items:center;gap:5px;padding:5px 9px;border-radius:var(--radius-sm);border:1px solid var(--border);background:none;color:var(--text2);font-size:0.78em;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s}
+.ctrl-btn:hover{color:var(--text);border-color:var(--border2)}
+.ctrl-btn svg{width:14px;height:14px;flex-shrink:0}
+body.fa{font-family:'Vazirmatn','Tahoma','Outfit',sans-serif}
 </style>
 </head>
 <body>
 <aside class="sidebar" id="sidebar">
 <div class="sidebar-brand">
 <div class="sidebar-brand-name"><div class="brand-dot"></div>GhostGate</div>
-<div class="sidebar-brand-sub">Subscription Manager · v{{version}}</div>
+<div class="sidebar-brand-sub"><span data-i18n="brand_sub">Subscription Manager</span> · v{{version}}</div>
+</div>
+<div class="sidebar-controls">
+<button class="ctrl-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+</button>
+<button class="ctrl-btn" id="lang-btn" onclick="toggleLang()"><span id="lang-label">EN</span></button>
 </div>
 <nav class="sidebar-nav">
 <button class="nav-item active" onclick="nav('overview',this)">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-Overview
+<span data-i18n="nav_overview">Overview</span>
 </button>
 <button class="nav-item" onclick="nav('subs',this)">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-Subscriptions
+<span data-i18n="nav_subs">Subscriptions</span>
 </button>
 <button class="nav-item" onclick="nav('nodes',this)">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-Nodes
+<span data-i18n="nav_nodes">Nodes</span>
 </button>
 <button class="nav-item" onclick="nav('logs',this)">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-Logs
+<span data-i18n="nav_logs">Logs</span>
 </button>
 <button class="nav-item" onclick="nav('settings',this)">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-Settings
+<span data-i18n="nav_settings">Settings</span>
 </button>
 </nav>
 <div class="sidebar-footer">
 <button class="nav-item" onclick="location.reload()">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-Refresh
+<span data-i18n="nav_refresh">Refresh</span>
 </button>
 </div>
 </aside>
@@ -310,37 +347,37 @@ Refresh
 <div class="svc-running"><div class="svc-dot" id="svc-dot"></div><span id="svc-txt">Loading...</span></div>
 </div>
 <div class="card-actions">
-<button class="card-action" onclick="nav('logs',document.querySelectorAll('.nav-item')[3])"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Logs</button>
-<button class="card-action" onclick="nav('subs',document.querySelectorAll('.nav-item')[1])"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Subscriptions</button>
-<button class="card-action" onclick="nav('nodes',document.querySelectorAll('.nav-item')[2])"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/></svg>Nodes</button>
+<button class="card-action" onclick="nav('logs',document.querySelectorAll('.nav-item')[3])"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span data-i18n="nav_logs">Logs</span></button>
+<button class="card-action" onclick="nav('subs',document.querySelectorAll('.nav-item')[1])"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><span data-i18n="nav_subs">Subscriptions</span></button>
+<button class="card-action" onclick="nav('nodes',document.querySelectorAll('.nav-item')[2])"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/></svg><span data-i18n="nav_nodes">Nodes</span></button>
 </div>
 </div>
 <div class="card">
-<div class="card-header"><span class="card-title">Subscription Stats</span></div>
+<div class="card-header"><span class="card-title" data-i18n="card_sub_stats">Subscription Stats</span></div>
 <div class="card-body">
-<div class="stat-row"><span class="stat-k">Total Subscriptions</span><span class="stat-v" id="st-total">-</span></div>
-<div class="stat-row"><span class="stat-k">Active</span><span class="stat-v" id="st-active">-</span></div>
-<div class="stat-row"><span class="stat-k">Nodes Online</span><span class="stat-v" id="st-nodes">-</span></div>
+<div class="stat-row"><span class="stat-k" data-i18n="stat_total_subs">Total Subscriptions</span><span class="stat-v" id="st-total">-</span></div>
+<div class="stat-row"><span class="stat-k" data-i18n="stat_active">Active</span><span class="stat-v" id="st-active">-</span></div>
+<div class="stat-row"><span class="stat-k" data-i18n="stat_nodes_online">Nodes Online</span><span class="stat-v" id="st-nodes">-</span></div>
 </div>
 </div>
 </div>
 
 <div class="cards-grid">
 <div class="card">
-<div class="card-header"><span class="card-title">Network Speed</span></div>
+<div class="card-header"><span class="card-title" data-i18n="card_net_speed">Network Speed</span></div>
 <div class="card-body">
 <div class="speed-grid">
-<div><div class="speed-label">Upload</div><div class="speed-val"><span class="arrow-up">↑</span><span id="spd-up">0 B/s</span></div></div>
-<div><div class="speed-label">Download</div><div class="speed-val"><span class="arrow-dn">↓</span><span id="spd-dn">0 B/s</span></div></div>
+<div><div class="speed-label" data-i18n="spd_upload">Upload</div><div class="speed-val"><span class="arrow-up">↑</span><span id="spd-up">0 B/s</span></div></div>
+<div><div class="speed-label" data-i18n="spd_download">Download</div><div class="speed-val"><span class="arrow-dn">↓</span><span id="spd-dn">0 B/s</span></div></div>
 </div>
 </div>
 </div>
 <div class="card">
-<div class="card-header"><span class="card-title">Total Data</span></div>
+<div class="card-header"><span class="card-title" data-i18n="card_total_data">Total Data</span></div>
 <div class="card-body">
 <div class="speed-grid">
-<div><div class="speed-label">Sent</div><div class="speed-val"><span class="arrow-up">↑</span><span id="tot-sent">-</span></div></div>
-<div><div class="speed-label">Received</div><div class="speed-val"><span class="arrow-dn">↓</span><span id="tot-recv">-</span></div></div>
+<div><div class="speed-label" data-i18n="spd_sent">Sent</div><div class="speed-val"><span class="arrow-up">↑</span><span id="tot-sent">-</span></div></div>
+<div><div class="speed-label" data-i18n="spd_received">Received</div><div class="speed-val"><span class="arrow-dn">↓</span><span id="tot-recv">-</span></div></div>
 </div>
 </div>
 </div>
@@ -348,11 +385,11 @@ Refresh
 
 <div class="cards-grid">
 <div class="card">
-<div class="card-header"><span class="card-title">System Load</span></div>
+<div class="card-header"><span class="card-title" data-i18n="card_sys_load">System Load</span></div>
 <div class="card-body"><div class="badges" id="load-badges"></div></div>
 </div>
 <div class="card">
-<div class="card-header"><span class="card-title">Recent Accesses</span></div>
+<div class="card-header"><span class="card-title" data-i18n="card_recent">Recent Accesses</span></div>
 <div class="card-body" style="padding:0">
 <table class="tbl" id="recent-tbl">
 <tbody id="recent-tbody"></tbody>
@@ -364,9 +401,9 @@ Refresh
 
 <div class="page" id="page-subs">
 <div class="stats-bar" id="sub-stats-bar">
-<div class="sbar-item"><div class="sbar-label">Total</div><div class="sbar-val" id="ss-total">-</div></div>
-<div class="sbar-item"><div class="sbar-label">Active</div><div class="sbar-val" id="ss-active">-</div></div>
-<div class="sbar-item"><div class="sbar-label">Nodes</div><div class="sbar-val" id="ss-nodes">-</div></div>
+<div class="sbar-item"><div class="sbar-label" data-i18n="ss_total">Total</div><div class="sbar-val" id="ss-total">-</div></div>
+<div class="sbar-item"><div class="sbar-label" data-i18n="ss_active">Active</div><div class="sbar-val" id="ss-active">-</div></div>
+<div class="sbar-item"><div class="sbar-label" data-i18n="ss_nodes">Nodes</div><div class="sbar-val" id="ss-nodes">-</div></div>
 </div>
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px">
 <div class="page-toolbar" style="margin:0;flex:1">
@@ -382,10 +419,10 @@ Refresh
 <select class="fi" id="s-filter-tag" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="onFilterChange()"><option value="">All Tags</option></select>
 <input class="fi" id="s-filter-data-above" type="number" min="0" step="0.1" placeholder="Data > GB" style="width:90px;padding:6px 8px;font-size:0.82em" oninput="onFilterChangeDebounce()">
 <input class="fi" id="s-filter-data-below" type="number" min="0" step="0.1" placeholder="Data < GB" style="width:90px;padding:6px 8px;font-size:0.82em" oninput="onFilterChangeDebounce()">
-<button class="btn btn-accent" onclick="openCreate()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New</button>
+<button class="btn btn-accent" onclick="openCreate()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span data-i18n="btn_new">New</span></button>
 </div>
 <div style="display:flex;align-items:center;gap:8px">
-<button class="btn btn-ghost btn-sm" id="sort-reset-btn" style="display:none" onclick="resetSort()">Reset Sort</button>
+<button class="btn btn-ghost btn-sm" id="sort-reset-btn" style="display:none" onclick="resetSort()" data-i18n="btn_reset_sort">Reset Sort</button>
 <select class="fi" id="per-page-sel" style="width:auto;padding:6px 10px;font-size:0.82em" onchange="changePerPage(this.value)">
 <option value="10">10/page</option>
 <option value="20" selected>20/page</option>
@@ -400,34 +437,34 @@ Refresh
 <div id="bulk-bar" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:var(--card2);border:1px solid var(--accent-border);border-radius:var(--radius-sm);margin-bottom:10px;flex-wrap:wrap">
 <span id="bulk-count" style="font-size:0.84em;font-weight:700;color:var(--accent)"></span>
 <select class="fi" id="bulk-node" style="width:auto;flex:1;min-width:140px;max-width:220px"></select>
-<button class="btn btn-accent btn-sm" onclick="bulkNodes('add')">Add to Node</button>
-<button class="btn btn-danger btn-sm" onclick="bulkNodes('remove')">Remove from Node</button>
-<button class="btn btn-ghost btn-sm" onclick="bulkToggle(true)">Enable Selected</button>
-<button class="btn btn-ghost btn-sm" onclick="bulkToggle(false)">Disable Selected</button>
+<button class="btn btn-accent btn-sm" onclick="bulkNodes('add')" data-i18n="btn_add_to_node">Add to Node</button>
+<button class="btn btn-danger btn-sm" onclick="bulkNodes('remove')" data-i18n="btn_remove_from_node">Remove from Node</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkToggle(true)" data-i18n="btn_enable">Enable Selected</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkToggle(false)" data-i18n="btn_disable">Disable Selected</button>
 <input class="fi" id="bulk-add-gb" type="number" min="0" step="0.1" placeholder="GB" style="width:72px;padding:5px 8px;font-size:0.82em">
-<button class="btn btn-ghost btn-sm" onclick="bulkExtend('data',1)">+Data</button>
-<button class="btn btn-danger btn-sm" onclick="bulkExtend('data',-1)">-Data</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkExtend('data',1)" data-i18n="btn_data_add">+Data</button>
+<button class="btn btn-danger btn-sm" onclick="bulkExtend('data',-1)" data-i18n="btn_data_sub">-Data</button>
 <input class="fi" id="bulk-factor" type="number" min="0.01" step="0.1" placeholder="factor" style="width:72px;padding:5px 8px;font-size:0.82em">
-<button class="btn btn-ghost btn-sm" onclick="bulkDataScale('multiply')">×Data</button>
-<button class="btn btn-danger btn-sm" onclick="bulkDataScale('divide')">÷Data</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkDataScale('multiply')" data-i18n="btn_data_mul">×Data</button>
+<button class="btn btn-danger btn-sm" onclick="bulkDataScale('divide')" data-i18n="btn_data_div">÷Data</button>
 <input class="fi" id="bulk-add-days" type="number" min="1" placeholder="days" style="width:66px;padding:5px 8px;font-size:0.82em">
-<button class="btn btn-ghost btn-sm" onclick="bulkExtend('days',1)">+Days</button>
-<button class="btn btn-danger btn-sm" onclick="bulkExtend('days',-1)">-Days</button>
-<button class="btn btn-ghost btn-sm" onclick="bulkNoExpiry()">No Expiry</button>
-<button class="btn btn-ghost btn-sm" onclick="bulkNoDataLimit()">No Limit</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkExtend('days',1)" data-i18n="btn_days_add">+Days</button>
+<button class="btn btn-danger btn-sm" onclick="bulkExtend('days',-1)" data-i18n="btn_days_sub">-Days</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkNoExpiry()" data-i18n="btn_no_expiry">No Expiry</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkNoDataLimit()" data-i18n="btn_no_limit">No Limit</button>
 <input class="fi" id="bulk-note" type="text" placeholder="note" style="width:110px;padding:5px 8px;font-size:0.82em">
-<button class="btn btn-ghost btn-sm" onclick="bulkSetNote()">Set Note</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkSetNote()" data-i18n="btn_set_note">Set Note</button>
 <input class="fi" id="bulk-tag" type="text" placeholder="tag" style="width:90px;padding:5px 8px;font-size:0.82em">
-<button class="btn btn-ghost btn-sm" onclick="bulkTags('add')">+Tag</button>
-<button class="btn btn-danger btn-sm" onclick="bulkTags('remove')">-Tag</button>
-<button class="btn btn-ghost btn-sm" onclick="bulkResetTraffic()">Reset Traffic</button>
-<button class="btn btn-danger btn-sm" onclick="bulkDelete()">Delete</button>
-<button class="btn btn-ghost btn-sm" onclick="clearBulk()">Clear</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkTags('add')" data-i18n="btn_tag_add">+Tag</button>
+<button class="btn btn-danger btn-sm" onclick="bulkTags('remove')" data-i18n="btn_tag_sub">-Tag</button>
+<button class="btn btn-ghost btn-sm" onclick="bulkResetTraffic()" data-i18n="btn_reset_traffic">Reset Traffic</button>
+<button class="btn btn-danger btn-sm" onclick="bulkDelete()" data-i18n="btn_delete">Delete</button>
+<button class="btn btn-ghost btn-sm" onclick="clearBulk()" data-i18n="btn_clear_sel">Clear</button>
 </div>
 <div class="card">
 <div class="table-wrap">
 <table class="tbl">
-<thead><tr><th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAllSubs(this.checked)" style="accent-color:var(--accent)"></th><th>ID</th><th>Comment</th><th id="th-data" class="sortable" onclick="sortSubs('used_bytes')">Data</th><th id="th-expires" class="sortable" onclick="sortSubs('expire_at')">Expires</th><th>Note</th><th>Tags</th><th>Nodes</th><th>Status</th><th></th></tr></thead>
+<thead><tr><th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAllSubs(this.checked)" style="accent-color:var(--accent)"></th><th data-i18n="th_id">ID</th><th data-i18n="th_comment">Comment</th><th id="th-data" class="sortable" onclick="sortSubs('used_bytes')" data-i18n="th_data">Data</th><th id="th-expires" class="sortable" onclick="sortSubs('expire_at')" data-i18n="th_expires">Expires</th><th data-i18n="th_note">Note</th><th data-i18n="th_tags">Tags</th><th data-i18n="th_nodes">Nodes</th><th data-i18n="th_status">Status</th><th></th></tr></thead>
 <tbody id="s-tbody"></tbody>
 </table>
 </div>
@@ -437,7 +474,7 @@ Refresh
 
 <div class="page" id="page-nodes">
 <div class="page-toolbar" style="margin-bottom:14px">
-<button class="btn btn-accent" onclick="openNodeModal(null)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Node</button>
+<button class="btn btn-accent" onclick="openNodeModal(null)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span data-i18n="btn_add_node">Add Node</span></button>
 </div>
 <div id="n-alert" class="alert"></div>
 <div id="n-tree" class="ntree"></div>
@@ -445,58 +482,58 @@ Refresh
 
 <div class="page" id="page-logs">
 <div class="page-toolbar" style="margin-bottom:14px">
-<button class="btn btn-ghost" id="live-btn" onclick="toggleLive()">&#9654; Live</button>
-<button class="btn btn-ghost" onclick="document.getElementById('log-el').textContent=''">Clear</button>
+<button class="btn btn-ghost" id="live-btn" onclick="toggleLive()" data-i18n="btn_live">&#9654; Live</button>
+<button class="btn btn-ghost" onclick="document.getElementById('log-el').textContent=''" data-i18n="btn_clear">Clear</button>
 </div>
 <div class="log-box" id="log-el">Loading...</div>
 </div>
 
 <div class="page" id="page-settings">
-<div class="page-title" style="margin-bottom:18px">Settings</div>
+<div class="page-title" style="margin-bottom:18px" data-i18n="nav_settings">Settings</div>
 <div id="cfg-alert" class="alert"></div>
 <div class="cfg-grid">
 <div class="card">
-<div class="card-header"><span class="card-title">General</span></div>
+<div class="card-header"><span class="card-title" data-i18n="card_general">General</span></div>
 <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
-<div class="fg"><label class="fl">Base URL</label><input class="fi" id="cfg-url" placeholder="https://your-domain.com"></div>
-<div class="fg"><label class="fl">Panel Path</label><input class="fi" id="cfg-path" placeholder="e.g. mySecretPath123"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_base_url">Base URL</label><input class="fi" id="cfg-url" placeholder="https://your-domain.com"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_panel_path">Panel Path</label><input class="fi" id="cfg-path" placeholder="e.g. mySecretPath123"></div>
 <div class="fr">
-<div class="fg"><label class="fl">Host</label><input class="fi" id="cfg-host" placeholder="127.0.0.1"></div>
-<div class="fg"><label class="fl">Port</label><input class="fi" id="cfg-port" type="number" placeholder="5000"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_host">Host</label><input class="fi" id="cfg-host" placeholder="127.0.0.1"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_port">Port</label><input class="fi" id="cfg-port" type="number" placeholder="5000"></div>
 </div>
-<div class="fg"><label class="fl">Sync Interval (seconds)</label><input class="fi" id="cfg-sync" type="number" placeholder="20"></div>
-<div class="fg"><label class="fl">Update Check Interval (seconds)</label><input class="fi" id="cfg-update-interval" type="number" placeholder="300"></div>
-<div class="fg"><label class="fl">Data Label (subscription page)</label><input class="fi" id="cfg-data-label" placeholder="⬇️ Data left"></div>
-<div class="fg"><label class="fl">Expire Label (subscription page)</label><input class="fi" id="cfg-expire-label" placeholder="⏰ Expires"></div>
-<div class="fg"><label class="fl">Profile Title (header)</label><input class="fi" id="cfg-profile-title" placeholder="GhostGate Subscription"></div>
-<div class="fg"><label class="fl">Panel Worker Threads</label><input class="fi" id="cfg-threads" type="number" placeholder="8"></div>
-<div class="fg"><label class="fl">Log File</label><input class="fi" id="cfg-log" placeholder="/var/log/ghostgate.log"></div>
-<div class="fg"><label class="fl">Update Proxy (optional)</label><input class="fi" id="cfg-update-proxy" placeholder="http://proxy:3128"></div>
-<div class="fg"><label class="fl">Auto Update</label><select class="fi" id="cfg-auto-update"><option value="false">Disabled</option><option value="true">Enabled</option></select></div>
+<div class="fg"><label class="fl" data-i18n="lbl_sync_int">Sync Interval (seconds)</label><input class="fi" id="cfg-sync" type="number" placeholder="20"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_update_int">Update Check Interval (seconds)</label><input class="fi" id="cfg-update-interval" type="number" placeholder="300"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_data_label">Data Label (subscription page)</label><input class="fi" id="cfg-data-label" placeholder="⬇️ Data left"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_expire_label">Expire Label (subscription page)</label><input class="fi" id="cfg-expire-label" placeholder="⏰ Expires"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_profile_title">Profile Title (header)</label><input class="fi" id="cfg-profile-title" placeholder="GhostGate Subscription"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_threads">Panel Worker Threads</label><input class="fi" id="cfg-threads" type="number" placeholder="8"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_log_file">Log File</label><input class="fi" id="cfg-log" placeholder="/var/log/ghostgate.log"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_update_proxy">Update Proxy (optional)</label><input class="fi" id="cfg-update-proxy" placeholder="http://proxy:3128"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_auto_update">Auto Update</label><select class="fi" id="cfg-auto-update"><option value="false">Disabled</option><option value="true">Enabled</option></select></div>
 <div class="fg"><label class="fl">GhostGate</label><select class="fi" id="cfg-ghostgate-restart"><option value="false">Do not restart node Xray</option><option value="true">Restart node Xray for overlimit/expired sub-nodes</option></select></div>
 </div>
 </div>
 <div class="card">
-<div class="card-header"><span class="card-title">Telegram Bot</span></div>
+<div class="card-header"><span class="card-title" data-i18n="card_telegram">Telegram Bot</span></div>
 <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
-<div class="fg"><label class="fl">Bot Enabled</label><select class="fi" id="cfg-bot-enabled"><option value="true">Enabled</option><option value="false">Disabled</option></select></div>
-<div class="fg"><label class="fl">Bot Token</label><input class="fi" id="cfg-token" type="password" placeholder="123456:ABC-DEF..."></div>
-<div class="fg"><label class="fl">Admin User ID</label><input class="fi" id="cfg-admin" placeholder="123456789"></div>
-<div class="fg"><label class="fl">Bot Proxy (optional)</label><input class="fi" id="cfg-proxy" placeholder="http://proxy:3128"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_bot_enabled">Bot Enabled</label><select class="fi" id="cfg-bot-enabled"><option value="true">Enabled</option><option value="false">Disabled</option></select></div>
+<div class="fg"><label class="fl" data-i18n="lbl_bot_token">Bot Token</label><input class="fi" id="cfg-token" type="password" placeholder="123456:ABC-DEF..."></div>
+<div class="fg"><label class="fl" data-i18n="lbl_admin_id">Admin User ID</label><input class="fi" id="cfg-admin" placeholder="123456789"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_bot_proxy">Bot Proxy (optional)</label><input class="fi" id="cfg-proxy" placeholder="http://proxy:3128"></div>
 </div>
 </div>
 </div>
 <div class="card" style="margin-top:16px;max-width:900px">
-<div class="card-header"><span class="card-title">Updates</span><span id="upd-info" style="font-size:0.82em;color:var(--text2)"></span></div>
+<div class="card-header"><span class="card-title" data-i18n="card_updates">Updates</span><span id="upd-info" style="font-size:0.82em;color:var(--text2)"></span></div>
 <div class="card-body" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-<button class="btn btn-ghost" onclick="checkUpdate()">Check for Update</button>
-<button class="btn btn-accent" id="upd-apply-btn" style="display:none" onclick="applyUpdate()">Apply Update</button>
+<button class="btn btn-ghost" onclick="checkUpdate()" data-i18n="btn_check_update">Check for Update</button>
+<button class="btn btn-accent" id="upd-apply-btn" style="display:none" onclick="applyUpdate()" data-i18n="btn_apply_update">Apply Update</button>
 <span id="upd-status" style="font-size:0.84em;color:var(--text2)"></span>
 </div>
 </div>
 <div style="display:flex;gap:10px;margin-top:16px;max-width:900px">
-<button class="btn btn-accent" onclick="saveSettings()">Save Changes</button>
-<button class="btn btn-danger" style="border-color:rgba(239,68,68,0.3)" onclick="restartPanel()">Restart Panel</button>
+<button class="btn btn-accent" onclick="saveSettings()" data-i18n="btn_save_cfg">Save Changes</button>
+<button class="btn btn-danger" style="border-color:rgba(239,68,68,0.3)" onclick="restartPanel()" data-i18n="btn_restart">Restart Panel</button>
 </div>
 </div>
 
@@ -505,52 +542,52 @@ Refresh
 
 <div class="overlay" id="m-create">
 <div class="modal">
-<div class="modal-hd"><h3 id="mc-title">New Subscription</h3><button class="modal-x" onclick="closeM('m-create')">&#215;</button></div>
+<div class="modal-hd"><h3 id="mc-title" data-i18n="modal_new_sub">New Subscription</h3><button class="modal-x" onclick="closeM('m-create')">&#215;</button></div>
 <div class="modal-bd">
 <div id="mc-alert" class="alert"></div>
-<div class="fg"><label class="fl">Comment / Name</label><input class="fi" id="mc-comment" placeholder="e.g. John Doe"></div>
-<div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="mc-note" placeholder="Note, leave blank to hide"></div>
-<div class="fg"><label class="fl">Tags (comma-separated, admin only)</label><input class="fi" id="mc-tags" placeholder="e.g. premium, europe"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_comment">Comment / Name</label><input class="fi" id="mc-comment" placeholder="e.g. John Doe"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_note">Note (optional)</label><input class="fi" id="mc-note" placeholder="Note, leave blank to hide"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_tags">Tags (comma-separated, admin only)</label><input class="fi" id="mc-tags" placeholder="e.g. premium, europe"></div>
 <div class="fr">
-<div class="fg"><label class="fl">Data Limit (GB, 0=∞)</label><input class="fi" id="mc-data" type="number" value="0" min="0" step="0.1"></div>
-<div class="fg"><label class="fl">Validity (days, 0=∞)</label><input class="fi" id="mc-days" type="number" value="30" min="0"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_data_limit">Data Limit (GB, 0=∞)</label><input class="fi" id="mc-data" type="number" value="0" min="0" step="0.1"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_validity">Validity (days, 0=∞)</label><input class="fi" id="mc-days" type="number" value="30" min="0"></div>
 </div>
-<div class="fg" style="margin-top:-6px"><label class="fl" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="mc-firstuse" style="accent-color:var(--accent)" onchange="document.getElementById('mc-firstuse-days').style.display=this.checked?'':'none'">Start expiry after first use</label></div>
-<div class="fg" id="mc-firstuse-days" style="display:none"><label class="fl">First-use expiry (days)</label><input class="fi" type="number" value="30" min="1"></div>
-<div class="fg"><label class="fl">IP Limit (0=∞)</label><input class="fi" id="mc-ip" type="number" value="0" min="0"></div>
+<div class="fg" style="margin-top:-6px"><label class="fl" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="mc-firstuse" style="accent-color:var(--accent)" onchange="document.getElementById('mc-firstuse-days').style.display=this.checked?'':'none'"><span data-i18n="lbl_first_use">Start expiry after first use</span></label></div>
+<div class="fg" id="mc-firstuse-days" style="display:none"><label class="fl" data-i18n="lbl_first_use_expiry">First-use expiry (days)</label><input class="fi" type="number" value="30" min="1"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_ip_limit">IP Limit (0=∞)</label><input class="fi" id="mc-ip" type="number" value="0" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="mc-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
-<div class="fg"><label class="fl" style="display:flex;justify-content:space-between;align-items:center">Nodes<span style="display:flex;gap:4px"><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selAll('mc-nodes')">All</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selNone('mc-nodes')">None</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_savePreset('mc-nodes')">+ Preset</button></span></label><div id="mc-nodes-preset-bar" style="display:flex;gap:4px;flex-wrap:wrap;min-height:0;margin-bottom:2px"></div><div class="nodes-list" id="mc-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading nodes...</div></div></div>
+<div class="fg"><label class="fl" style="display:flex;justify-content:space-between;align-items:center"><span data-i18n="lbl_nodes">Nodes</span><span style="display:flex;gap:4px"><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selAll('mc-nodes')" data-i18n="btn_all">All</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selNone('mc-nodes')" data-i18n="btn_none">None</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_savePreset('mc-nodes')" data-i18n="btn_preset">+ Preset</button></span></label><div id="mc-nodes-preset-bar" style="display:flex;gap:4px;flex-wrap:wrap;min-height:0;margin-bottom:2px"></div><div class="nodes-list" id="mc-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading nodes...</div></div></div>
 </div>
 <div class="modal-ft">
-<button class="btn btn-ghost" onclick="closeM('m-create')">Cancel</button>
-<button class="btn btn-accent" id="mc-submit" onclick="submitCreate()">Create</button>
+<button class="btn btn-ghost" onclick="closeM('m-create')" data-i18n="btn_cancel">Cancel</button>
+<button class="btn btn-accent" id="mc-submit" onclick="submitCreate()" data-i18n="btn_create">Create</button>
 </div>
 </div>
 </div>
 
 <div class="overlay" id="m-edit">
 <div class="modal">
-<div class="modal-hd"><h3>Edit Subscription</h3><button class="modal-x" onclick="closeM('m-edit')">&#215;</button></div>
+<div class="modal-hd"><h3 data-i18n="modal_edit_sub">Edit Subscription</h3><button class="modal-x" onclick="closeM('m-edit')">&#215;</button></div>
 <div class="modal-bd">
 <div id="me-alert" class="alert"></div>
-<div class="fg"><label class="fl">Comment</label><input class="fi" id="me-comment"></div>
-<div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="me-note" placeholder="Note, leave blank to hide"></div>
-<div class="fg"><label class="fl">Tags (comma-separated, admin only)</label><input class="fi" id="me-tags" placeholder="e.g. premium, europe"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_comment_edit">Comment</label><input class="fi" id="me-comment"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_note">Note (optional)</label><input class="fi" id="me-note" placeholder="Note, leave blank to hide"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_tags">Tags (comma-separated, admin only)</label><input class="fi" id="me-tags" placeholder="e.g. premium, europe"></div>
 <div class="fr">
-<div class="fg"><label class="fl">Data Limit (GB)</label><input class="fi" id="me-data" type="number" min="0" step="0.1"></div>
-<div class="fg"><label class="fl">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0" oninput="syncEditExpiryMode()"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_data_limit_gb">Data Limit (GB)</label><input class="fi" id="me-data" type="number" min="0" step="0.1"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_days">Days (+ add / − remove)</label><input class="fi" id="me-days" type="number" value="0" oninput="syncEditExpiryMode()"></div>
 </div>
-<div class="fg" style="margin-top:-6px"><label class="fl" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="me-firstuse" style="accent-color:var(--accent)" onchange="syncEditExpiryMode()">Start expiry after first use</label></div>
-<div class="fg" id="me-firstuse-days" style="display:none"><label class="fl">First-use expiry (days)</label><input class="fi" type="number" value="30" min="1"></div>
-<div class="fg"><label class="fl">Set Exact Expiry Date</label><input class="fi" id="me-expire-date" type="date" onchange="syncEditExpiryMode()"></div>
-<div style="display:flex;gap:8px"><button id="me-no-expire-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoExpire()">Set No Expiry</button><button id="me-no-limit-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoDataLimit()">Set No Data Limit</button></div>
-<div class="fg"><label class="fl">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
+<div class="fg" style="margin-top:-6px"><label class="fl" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="me-firstuse" style="accent-color:var(--accent)" onchange="syncEditExpiryMode()"><span data-i18n="lbl_first_use">Start expiry after first use</span></label></div>
+<div class="fg" id="me-firstuse-days" style="display:none"><label class="fl" data-i18n="lbl_first_use_expiry">First-use expiry (days)</label><input class="fi" type="number" value="30" min="1"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_exact_expiry">Set Exact Expiry Date</label><input class="fi" id="me-expire-date" type="date" onchange="syncEditExpiryMode()"></div>
+<div style="display:flex;gap:8px"><button id="me-no-expire-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoExpire()" data-i18n="btn_set_no_expiry">Set No Expiry</button><button id="me-no-limit-btn" class="btn btn-ghost btn-sm" style="flex:1" onclick="setNoDataLimit()" data-i18n="btn_set_no_limit">Set No Data Limit</button></div>
+<div class="fg"><label class="fl" data-i18n="lbl_ip_limit">IP Limit</label><input class="fi" id="me-ip" type="number" min="0"></div>
 <div class="fg adv-field" style="display:none"><label class="fl" style="color:var(--warning)">Show Multiplier (×)</label><input class="fi" id="me-sm" type="number" value="1" min="1" max="100" style="border-color:rgba(245,158,11,0.3)"></div>
-<div class="fg"><label class="fl">Node Order</label><div id="me-node-order"></div><label class="fl" style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">Add / Remove Nodes<span style="display:flex;gap:4px"><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selAll('me-nodes')">All</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selNone('me-nodes')">None</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_savePreset('me-nodes')">+ Preset</button></span></label><div id="me-nodes-preset-bar" style="display:flex;gap:4px;flex-wrap:wrap;min-height:0;margin-bottom:2px"></div><div class="nodes-list" id="me-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading...</div></div></div>
+<div class="fg"><label class="fl" data-i18n="lbl_node_order">Node Order</label><div id="me-node-order"></div><label class="fl" style="margin-top:6px;display:flex;justify-content:space-between;align-items:center"><span data-i18n="lbl_add_remove_nodes">Add / Remove Nodes</span><span style="display:flex;gap:4px"><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selAll('me-nodes')" data-i18n="btn_all">All</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_selNone('me-nodes')" data-i18n="btn_none">None</button><button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.75em" onclick="_savePreset('me-nodes')" data-i18n="btn_preset">+ Preset</button></span></label><div id="me-nodes-preset-bar" style="display:flex;gap:4px;flex-wrap:wrap;min-height:0;margin-bottom:2px"></div><div class="nodes-list" id="me-nodes"><div style="color:var(--text2);font-size:0.85em;padding:8px">Loading...</div></div></div>
 </div>
 <div class="modal-ft">
-<button class="btn btn-ghost" onclick="closeM('m-edit')">Cancel</button>
-<button class="btn btn-accent" onclick="submitEdit()">Save</button>
+<button class="btn btn-ghost" onclick="closeM('m-edit')" data-i18n="btn_cancel">Cancel</button>
+<button class="btn btn-accent" onclick="submitEdit()" data-i18n="btn_save_modal">Save</button>
 </div>
 </div>
 </div>
@@ -565,59 +602,59 @@ Refresh
 <div class="detail-rows" id="md-rows"></div>
 </div>
 <div class="modal-ft">
-<button class="btn btn-ghost" id="md-regen-btn" onclick="regenSubId()">Regen ID</button>
-<button class="btn btn-ghost" id="md-regen-uuid-btn" onclick="regenSubUuid()">Regen UUID</button>
-<button class="btn btn-ghost" id="md-reset-traffic-btn" onclick="resetSubTraffic()">Reset Traffic</button>
-<button class="btn btn-ghost" onclick="openConfigs()">Node Configs</button>
+<button class="btn btn-ghost" id="md-regen-btn" onclick="regenSubId()" data-i18n="btn_regen_id">Regen ID</button>
+<button class="btn btn-ghost" id="md-regen-uuid-btn" onclick="regenSubUuid()" data-i18n="btn_regen_uuid">Regen UUID</button>
+<button class="btn btn-ghost" id="md-reset-traffic-btn" onclick="resetSubTraffic()" data-i18n="btn_reset_traffic">Reset Traffic</button>
+<button class="btn btn-ghost" onclick="openConfigs()" data-i18n="btn_node_configs">Node Configs</button>
 </div>
 </div>
 </div>
 
 <div class="overlay" id="m-configs">
 <div class="modal wide">
-<div class="modal-hd"><h3>Node Configs</h3><button class="modal-x" onclick="closeM('m-configs')">&#215;</button></div>
+<div class="modal-hd"><h3 data-i18n="modal_node_configs">Node Configs</h3><button class="modal-x" onclick="closeM('m-configs')">&#215;</button></div>
 <div class="modal-bd" id="mc-configs-body" style="gap:8px"></div>
-<div class="modal-ft"><button class="btn btn-ghost" onclick="closeM('m-configs')">Close</button></div>
+<div class="modal-ft"><button class="btn btn-ghost" onclick="closeM('m-configs')" data-i18n="btn_close">Close</button></div>
 </div>
 </div>
 
 <div class="overlay" id="m-node">
 <div class="modal">
-<div class="modal-hd"><h3 id="mn-title">Add Node</h3><button class="modal-x" onclick="closeM('m-node')">&#215;</button></div>
+<div class="modal-hd"><h3 id="mn-title" data-i18n="modal_add_node">Add Node</h3><button class="modal-x" onclick="closeM('m-node')">&#215;</button></div>
 <div class="modal-bd">
 <div id="mn-alert" class="alert"></div>
-<div class="fg"><label class="fl">Name</label><input class="fi" id="mn-name" placeholder="e.g. Germany VPS"></div>
-<div class="fg"><label class="fl">3x-ui Address</label><input class="fi" id="mn-addr" placeholder="http://1.2.3.4:54321"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_node_name">Name</label><input class="fi" id="mn-name" placeholder="e.g. Germany VPS"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_node_addr">3x-ui Address</label><input class="fi" id="mn-addr" placeholder="http://1.2.3.4:54321"></div>
 <div class="fr">
-<div class="fg"><label class="fl">Username</label><input class="fi" id="mn-user" placeholder="admin"></div>
-<div class="fg"><label class="fl">Password</label><input class="fi" id="mn-pass" type="password" placeholder="password"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_username">Username</label><input class="fi" id="mn-user" placeholder="admin"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_password">Password</label><input class="fi" id="mn-pass" type="password" placeholder="password"></div>
 </div>
-<div class="fg"><label class="fl">HTTP/HTTPS Proxy</label><input class="fi" id="mn-proxy" placeholder="http://proxy:3128 (optional)"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_proxy">HTTP/HTTPS Proxy</label><input class="fi" id="mn-proxy" placeholder="http://proxy:3128 (optional)"></div>
 </div>
 <div class="modal-ft">
-<button class="btn btn-ghost" onclick="closeM('m-node')">Cancel</button>
-<button class="btn btn-ghost" onclick="testNewNode()">Test Connection</button>
-<button class="btn btn-accent" onclick="submitNode()">Save</button>
+<button class="btn btn-ghost" onclick="closeM('m-node')" data-i18n="btn_cancel">Cancel</button>
+<button class="btn btn-ghost" onclick="testNewNode()" data-i18n="btn_test_conn">Test Connection</button>
+<button class="btn btn-accent" onclick="submitNode()" data-i18n="btn_save_modal">Save</button>
 </div>
 </div>
 </div>
 
 <div class="overlay" id="m-inbound">
 <div class="modal">
-<div class="modal-hd"><h3 id="mi-title">Add Sub-node</h3><button class="modal-x" onclick="closeM('m-inbound')">&#215;</button></div>
+<div class="modal-hd"><h3 id="mi-title" data-i18n="modal_add_subnode">Add Sub-node</h3><button class="modal-x" onclick="closeM('m-inbound')">&#215;</button></div>
 <div class="modal-bd">
 <div id="mi-alert" class="alert"></div>
-<div class="fg"><label class="fl">Display Name</label><input class="fi" id="mi-name" placeholder="e.g. Germany 1"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_display_name">Display Name</label><input class="fi" id="mi-name" placeholder="e.g. Germany 1"></div>
 <div class="fr">
-<div class="fg"><label class="fl">Inbound ID</label><input class="fi" id="mi-inbound" type="number" placeholder="1" min="1"></div>
-<div class="fg" style="max-width:130px"><label class="fl">Traffic Multiplier</label><input class="fi" id="mi-multiplier" type="number" step="0.1" min="0" placeholder="1"></div>
+<div class="fg"><label class="fl" data-i18n="lbl_inbound_id">Inbound ID</label><input class="fi" id="mi-inbound" type="number" placeholder="1" min="1"></div>
+<div class="fg" style="max-width:130px"><label class="fl" data-i18n="lbl_multiplier">Traffic Multiplier</label><input class="fi" id="mi-multiplier" type="number" step="0.1" min="0" placeholder="1"></div>
 </div>
-<div class="fg"><label class="fl">Status</label><select class="fi" id="mi-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+<div class="fg"><label class="fl" data-i18n="lbl_status">Status</label><select class="fi" id="mi-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
 </div>
 <div class="modal-ft">
-<button class="btn btn-ghost" onclick="closeM('m-inbound')">Cancel</button>
-<button class="btn btn-ghost" onclick="testInboundModal()">Test</button>
-<button class="btn btn-accent" onclick="submitInbound()">Save</button>
+<button class="btn btn-ghost" onclick="closeM('m-inbound')" data-i18n="btn_cancel">Cancel</button>
+<button class="btn btn-ghost" onclick="testInboundModal()" data-i18n="btn_test">Test</button>
+<button class="btn btn-accent" onclick="submitInbound()" data-i18n="btn_save_modal">Save</button>
 </div>
 </div>
 </div>
@@ -648,7 +685,7 @@ function nav(name,btn){
   closeSidebar();
   if(name==="subs"){loadSubs();startSubsStream();loadTagFilter();}
   else if(name==="nodes") loadNodes();
-  else if(name==="logs"){ if(logStream){logStream.close();logStream=null;liveLog=false;document.getElementById("live-btn").textContent="▶ Live";} loadLogs(); }
+  else if(name==="logs"){ if(logStream){logStream.close();logStream=null;liveLog=false;document.getElementById("live-btn").textContent=t("btn_live");} loadLogs(); }
   else if(name==="settings") loadSettings();
 }
 
@@ -1370,12 +1407,12 @@ async function loadLogs(){
 
 function toggleLive(){
   const btn=document.getElementById("live-btn");
-  if(liveLog){ if(logStream){logStream.close();logStream=null;} liveLog=false; btn.textContent="▶ Live"; }
+  if(liveLog){ if(logStream){logStream.close();logStream=null;} liveLog=false; btn.textContent=t("btn_live"); }
   else{
-    liveLog=true; btn.textContent="⏸ Stop Live"; loadLogs();
+    liveLog=true; btn.textContent=t("btn_live_stop"); loadLogs();
     logStream=new EventSource(API+"/api/logs/stream");
     logStream.onmessage=function(e){ const el=document.getElementById("log-el"); el.textContent+=e.data+"\n"; el.scrollTop=el.scrollHeight; };
-    logStream.onerror=function(){ liveLog=false; btn.textContent="▶ Live"; };
+    logStream.onerror=function(){ liveLog=false; btn.textContent=t("btn_live"); };
   }
 }
 
@@ -1443,6 +1480,112 @@ function _toggleAdv(){_advUnlocked=!_advUnlocked;document.querySelectorAll(".adv
 document.addEventListener("keydown",function(e){if(e.shiftKey&&e.ctrlKey&&e.key==="M")_toggleAdv();});
 let _tapCount=0,_tapTimer=null;
 document.querySelectorAll(".modal-hd h3").forEach(function(h){h.addEventListener("click",function(){_tapCount++;clearTimeout(_tapTimer);_tapTimer=setTimeout(()=>_tapCount=0,1500);if(_tapCount>=5){_tapCount=0;_toggleAdv();}});});
+
+const _T={
+en:{
+nav_overview:"Overview",nav_subs:"Subscriptions",nav_nodes:"Nodes",nav_logs:"Logs",nav_settings:"Settings",nav_refresh:"Refresh",
+brand_sub:"Subscription Manager",
+card_sub_stats:"Subscription Stats",card_net_speed:"Network Speed",card_total_data:"Total Data",card_sys_load:"System Load",card_recent:"Recent Accesses",
+stat_total_subs:"Total Subscriptions",stat_active:"Active",stat_nodes_online:"Nodes Online",
+spd_upload:"Upload",spd_download:"Download",spd_sent:"Sent",spd_received:"Received",
+ss_total:"Total",ss_active:"Active",ss_nodes:"Nodes",
+btn_new:"New",btn_reset_sort:"Reset Sort",btn_add_node:"Add Node",
+btn_live:"▶ Live",btn_live_stop:"⏸ Stop Live",btn_clear:"Clear",
+card_general:"General",card_telegram:"Telegram Bot",card_updates:"Updates",
+lbl_base_url:"Base URL",lbl_panel_path:"Panel Path",lbl_host:"Host",lbl_port:"Port",
+lbl_sync_int:"Sync Interval (seconds)",lbl_update_int:"Update Check Interval (seconds)",
+lbl_data_label:"Data Label (subscription page)",lbl_expire_label:"Expire Label (subscription page)",
+lbl_profile_title:"Profile Title (header)",lbl_threads:"Panel Worker Threads",
+lbl_log_file:"Log File",lbl_update_proxy:"Update Proxy (optional)",lbl_auto_update:"Auto Update",
+lbl_bot_enabled:"Bot Enabled",lbl_bot_token:"Bot Token",lbl_admin_id:"Admin User ID",lbl_bot_proxy:"Bot Proxy (optional)",
+btn_check_update:"Check for Update",btn_apply_update:"Apply Update",btn_save_cfg:"Save Changes",btn_restart:"Restart Panel",
+modal_new_sub:"New Subscription",modal_edit_sub:"Edit Subscription",modal_node_configs:"Node Configs",modal_add_node:"Add Node",modal_add_subnode:"Add Sub-node",
+lbl_comment:"Comment / Name",lbl_comment_edit:"Comment",lbl_note:"Note (optional)",lbl_tags:"Tags (comma-separated, admin only)",
+lbl_data_limit:"Data Limit (GB, 0=∞)",lbl_data_limit_gb:"Data Limit (GB)",lbl_validity:"Validity (days, 0=∞)",
+lbl_first_use:"Start expiry after first use",lbl_first_use_expiry:"First-use expiry (days)",
+lbl_ip_limit:"IP Limit (0=∞)",lbl_nodes:"Nodes",lbl_days:"Days (+ add / − remove)",
+lbl_exact_expiry:"Set Exact Expiry Date",lbl_node_order:"Node Order",lbl_add_remove_nodes:"Add / Remove Nodes",
+lbl_node_name:"Name",lbl_node_addr:"3x-ui Address",lbl_username:"Username",lbl_password:"Password",lbl_proxy:"HTTP/HTTPS Proxy",
+lbl_display_name:"Display Name",lbl_inbound_id:"Inbound ID",lbl_multiplier:"Traffic Multiplier",lbl_status:"Status",
+btn_cancel:"Cancel",btn_create:"Create",btn_save_modal:"Save",btn_close:"Close",
+btn_regen_id:"Regen ID",btn_regen_uuid:"Regen UUID",btn_reset_traffic:"Reset Traffic",btn_node_configs:"Node Configs",
+btn_test_conn:"Test Connection",btn_test:"Test",btn_all:"All",btn_none:"None",btn_preset:"+ Preset",
+btn_set_no_expiry:"Set No Expiry",btn_set_no_limit:"Set No Data Limit",
+btn_add_to_node:"Add to Node",btn_remove_from_node:"Remove from Node",
+btn_enable:"Enable Selected",btn_disable:"Disable Selected",
+btn_data_add:"+Data",btn_data_sub:"-Data",btn_data_mul:"×Data",btn_data_div:"÷Data",
+btn_days_add:"+Days",btn_days_sub:"-Days",btn_no_expiry:"No Expiry",btn_no_limit:"No Limit",
+btn_set_note:"Set Note",btn_tag_add:"+Tag",btn_tag_sub:"-Tag",btn_delete:"Delete",btn_clear_sel:"Clear",
+th_id:"ID",th_comment:"Comment",th_data:"Data",th_expires:"Expires",th_note:"Note",th_tags:"Tags",th_nodes:"Nodes",th_status:"Status",
+},
+fa:{
+nav_overview:"مرور کلی",nav_subs:"اشتراک‌ها",nav_nodes:"نودها",nav_logs:"لاگ‌ها",nav_settings:"تنظیمات",nav_refresh:"بارگذاری مجدد",
+brand_sub:"مدیر اشتراک",
+card_sub_stats:"آمار اشتراک",card_net_speed:"سرعت شبکه",card_total_data:"داده کل",card_sys_load:"بار سیستم",card_recent:"دسترسی‌های اخیر",
+stat_total_subs:"کل اشتراک‌ها",stat_active:"فعال",stat_nodes_online:"نودهای آنلاین",
+spd_upload:"آپلود",spd_download:"دانلود",spd_sent:"ارسال‌شده",spd_received:"دریافت‌شده",
+ss_total:"کل",ss_active:"فعال",ss_nodes:"نودها",
+btn_new:"جدید",btn_reset_sort:"ریست مرتب‌سازی",btn_add_node:"افزودن نود",
+btn_live:"▶ زنده",btn_live_stop:"⏸ توقف زنده",btn_clear:"پاک‌کردن",
+card_general:"عمومی",card_telegram:"ربات تلگرام",card_updates:"به‌روزرسانی‌ها",
+lbl_base_url:"آدرس پایه",lbl_panel_path:"مسیر پنل",lbl_host:"هاست",lbl_port:"پورت",
+lbl_sync_int:"فاصله همگام‌سازی (ثانیه)",lbl_update_int:"فاصله بررسی به‌روزرسانی (ثانیه)",
+lbl_data_label:"برچسب داده (صفحه اشتراک)",lbl_expire_label:"برچسب انقضا (صفحه اشتراک)",
+lbl_profile_title:"عنوان پروفایل (هدر)",lbl_threads:"تعداد تردهای پنل",
+lbl_log_file:"فایل لاگ",lbl_update_proxy:"پروکسی به‌روزرسانی (اختیاری)",lbl_auto_update:"به‌روزرسانی خودکار",
+lbl_bot_enabled:"وضعیت ربات",lbl_bot_token:"توکن ربات",lbl_admin_id:"آیدی ادمین",lbl_bot_proxy:"پروکسی ربات (اختیاری)",
+btn_check_update:"بررسی به‌روزرسانی",btn_apply_update:"اعمال به‌روزرسانی",btn_save_cfg:"ذخیره تغییرات",btn_restart:"ریستارت پنل",
+modal_new_sub:"اشتراک جدید",modal_edit_sub:"ویرایش اشتراک",modal_node_configs:"پیکربندی نودها",modal_add_node:"افزودن نود",modal_add_subnode:"افزودن زیرنود",
+lbl_comment:"نظر / نام",lbl_comment_edit:"نظر",lbl_note:"یادداشت (اختیاری)",lbl_tags:"تگ‌ها (جداشده با کاما، فقط ادمین)",
+lbl_data_limit:"محدودیت داده (GB، ۰=∞)",lbl_data_limit_gb:"محدودیت داده (GB)",lbl_validity:"اعتبار (روز، ۰=∞)",
+lbl_first_use:"شروع انقضا پس از اولین استفاده",lbl_first_use_expiry:"اعتبار اولین استفاده (روز)",
+lbl_ip_limit:"محدودیت IP (۰=∞)",lbl_nodes:"نودها",lbl_days:"روز (+ افزودن / − کاهش)",
+lbl_exact_expiry:"تاریخ انقضای دقیق",lbl_node_order:"ترتیب نودها",lbl_add_remove_nodes:"افزودن / حذف نودها",
+lbl_node_name:"نام",lbl_node_addr:"آدرس 3x-ui",lbl_username:"نام کاربری",lbl_password:"رمز عبور",lbl_proxy:"پروکسی HTTP/HTTPS",
+lbl_display_name:"نام نمایشی",lbl_inbound_id:"شناسه Inbound",lbl_multiplier:"ضریب ترافیک",lbl_status:"وضعیت",
+btn_cancel:"لغو",btn_create:"ایجاد",btn_save_modal:"ذخیره",btn_close:"بستن",
+btn_regen_id:"تجدید ID",btn_regen_uuid:"تجدید UUID",btn_reset_traffic:"ریست ترافیک",btn_node_configs:"پیکربندی نودها",
+btn_test_conn:"تست اتصال",btn_test:"تست",btn_all:"همه",btn_none:"هیچ",btn_preset:"+ پیش‌تنظیم",
+btn_set_no_expiry:"بدون انقضا",btn_set_no_limit:"بدون محدودیت داده",
+btn_add_to_node:"افزودن به نود",btn_remove_from_node:"حذف از نود",
+btn_enable:"فعال‌کردن انتخاب‌شده‌ها",btn_disable:"غیرفعال‌کردن انتخاب‌شده‌ها",
+btn_data_add:"+داده",btn_data_sub:"-داده",btn_data_mul:"×داده",btn_data_div:"÷داده",
+btn_days_add:"+روز",btn_days_sub:"-روز",btn_no_expiry:"بدون انقضا",btn_no_limit:"بدون محدودیت",
+btn_set_note:"ثبت یادداشت",btn_tag_add:"+تگ",btn_tag_sub:"-تگ",btn_delete:"حذف",btn_clear_sel:"پاک‌کردن",
+th_id:"شناسه",th_comment:"نظر",th_data:"داده",th_expires:"انقضا",th_note:"یادداشت",th_tags:"تگ‌ها",th_nodes:"نودها",th_status:"وضعیت",
+}
+};
+let _theme=localStorage.getItem("gg_theme")||"dark";
+let _lang=localStorage.getItem("gg_lang")||"en";
+function t(k){ return (_T[_lang]&&_T[_lang][k])||_T.en[k]||k; }
+function applyTheme(){
+  document.documentElement.setAttribute("data-theme",_theme);
+  const moonPath='<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  const sunPaths='<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+  document.querySelector("#theme-btn svg").innerHTML=_theme==="dark"?moonPath:sunPaths;
+}
+function toggleTheme(){
+  _theme=_theme==="dark"?"light":"dark";
+  localStorage.setItem("gg_theme",_theme);
+  applyTheme();
+}
+function applyLang(){
+  document.getElementById("lang-label").textContent=_lang==="en"?"EN":"FA";
+  document.body.classList.toggle("fa",_lang==="fa");
+  document.querySelectorAll("[data-i18n]").forEach(function(el){
+    const k=el.getAttribute("data-i18n");
+    if(k==="btn_live"&&liveLog){ el.textContent=t("btn_live_stop"); return; }
+    const v=t(k);
+    if(v) el.textContent=v;
+  });
+}
+function toggleLang(){
+  _lang=_lang==="en"?"fa":"en";
+  localStorage.setItem("gg_lang",_lang);
+  applyLang();
+}
+applyTheme();
+applyLang();
 </script>
 </body>
 </html>

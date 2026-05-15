@@ -8,7 +8,7 @@ import logging
 import platform
 import requests
 
-VERSION = "0.11.7"
+VERSION = "0.12.0"
 GITHUB_REPO = "frenchtoblerone54/ghostgate"
 _logger = logging.getLogger("updater")
 _arch = platform.machine()
